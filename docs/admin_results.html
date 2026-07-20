@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resultados de Evaluaciones - Recursos Humanos</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Quicksand', sans-serif;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(239, 246, 255, 1);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(147, 197, 253, 0.5);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 min-h-screen flex flex-col justify-between">
+
+  <!-- Header -->
+  <header class="bg-white/80 backdrop-blur-md border-b border-blue-100 shadow-sm sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="admin.html" class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-md hover:scale-105 transition">
+          <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div>
+          <h1 class="text-xl font-bold text-gray-800">perfiles</h1>
+        </div>
+      </div>
+      <div>
+        <a href="admin.html" class="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
+          Volver al Inicio
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- Filters and Search bar -->
+    <div class="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div class="flex-1 w-full relative">
+        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <input
+          id="results-search"
+          type="text"
+          class="w-full pl-10 pr-4 py-3 rounded-2xl border border-blue-100 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none transition"
+        >
+      </div>
+
+      <div class="flex gap-3 w-full md:w-auto">
+        <select
+          id="filter-vacancy"
+          class="flex-1 md:flex-initial px-4 py-3 rounded-2xl border border-blue-100 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+        >
+          <option value="">Todas las vacantes</option>
+        </select>
+
+        <button id="refresh-results-btn" class="p-3 text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-2xl transition duration-300" title="Recargar resultados">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Results Table/Grid -->
+    <div class="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm flex flex-col">
+      <div class="border-b border-blue-100 pb-3 mb-4">
+        <h2 class="text-lg font-bold text-gray-800">perfiles</h2>
+      </div>
+
+      <div class="overflow-x-auto custom-scroll">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-blue-100 text-blue-700 text-xs font-bold uppercase bg-blue-50/50">
+              <th class="py-3 px-4 rounded-l-2xl">Candidato</th>
+              <th class="py-3 px-4">Contacto</th>
+              <th class="py-3 px-4">Vacante</th>
+              <th class="py-3 px-4 text-center">Score Técnico</th>
+              <th class="py-3 px-4 text-center">Fecha</th>
+              <th class="py-3 px-4 text-right rounded-r-2xl">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="results-table-body" class="text-sm text-gray-600 divide-y divide-blue-50/50">
+            <tr>
+              <td colspan="6" class="text-center py-8 text-gray-400">
+                <i class="fa-regular fa-folder-open text-3xl mb-2 block text-blue-200"></i>
+                Cargando historial de resultados...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- REPORT DETAIL MODAL -->
+  <div id="result-modal" class="hidden fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-blue-100 overflow-hidden">
+
+      <!-- Modal Header -->
+      <div class="bg-blue-400 text-white p-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl">
+            <i class="fa-solid fa-id-card"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold" id="modal-cand-name">Nombre</h3>
+            <p class="text-xs text-blue-100" id="modal-cand-pos">Vacante</p>
+          </div>
+        </div>
+        <button id="modal-close-btn" class="text-white hover:bg-white/10 rounded-xl p-2 transition">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto custom-scroll flex-1 space-y-6">
+
+        <!-- Key Metadata -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
+            <span class="text-[10px] text-blue-600 font-bold uppercase tracking-wider block">Correo</span>
+            <span id="modal-cand-email" class="text-sm font-semibold text-gray-700">email</span>
+          </div>
+          <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
+            <span class="text-[10px] text-blue-600 font-bold uppercase tracking-wider block">Teléfono</span>
+            <span id="modal-cand-phone" class="text-sm font-semibold text-gray-700">phone</span>
+          </div>
+          <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block">Aciertos Técnicos</span>
+              <span id="modal-cand-score" class="text-lg font-bold text-gray-800">0 / 0</span>
+            </div>
+            <div id="modal-cand-percentage" class="text-xs font-extrabold bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full">
+              0%
+            </div>
+          </div>
+        </div>
+
+        <!-- Candidate Registration Form Answers -->
+        <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+          <h4 class="text-xs font-bold text-gray-700 mb-2"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> Respuestas de Formulario de Registro</h4>
+          <div id="modal-cand-info-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600">
+            <!-- Dynamic registration fields answered -->
+          </div>
+        </div>
+
+        <!-- Habilitar examen extra en cualquier momento -->
+        <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+          <h4 class="text-xs font-bold text-blue-700 mb-2"><i class="fa-solid fa-circle-plus mr-1"></i> Habilitar Examen Adicional a este Candidato</h4>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <select id="modal-assign-extra-select" class="flex-1 px-3 py-2 border border-blue-200 rounded-xl text-xs bg-white focus:outline-none">
+              <option value="">Cargando exámenes...</option>
+            </select>
+            <button id="modal-btn-assign-extra" class="px-4 py-2 bg-blue-400 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition">
+              Asignar Examen
+            </button>
+          </div>
+        </div>
+
+        <!-- Evaluation Tabbed Answers -->
+        <div class="space-y-4">
+          <div class="flex border-b border-blue-100">
+            <button id="modal-tab-psy-btn" class="pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm">
+              <i class="fa-solid fa-brain mr-1"></i> Respuestas Psicométricas
+            </button>
+            <button id="modal-tab-tech-btn" class="pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600">
+              <i class="fa-solid fa-code mr-1"></i> Respuestas del Examen Profesional
+            </button>
+          </div>
+
+          <div id="modal-answers-psy" class="space-y-3"></div>
+          <div id="modal-answers-tech" class="hidden space-y-3"></div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="bg-gray-50 p-4 border-t border-blue-100 flex justify-end">
+        <button id="modal-print-btn" class="px-5 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold rounded-xl text-sm transition mr-3">
+          <i class="fa-solid fa-print mr-1"></i> Imprimir Reporte
+        </button>
+        <button id="modal-close-bottom-btn" class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-sm transition">
+          Cerrar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="bg-white border-t border-blue-100 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-400">
+      &copy; 2025 Recursos Humanos Inc. Todos los derechos reservados.
+    </div>
+  </footer>
+
+  <script src="js/supabase.js"></script>
+  <script src="js/admin_results.js"></script>
+</body>
+</html>

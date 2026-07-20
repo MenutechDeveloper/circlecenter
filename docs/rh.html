@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluaciones Técnicas y Psicométricas - Portal Candidatos</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Quicksand', sans-serif;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(239, 246, 255, 1);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(147, 197, 253, 0.5);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-tr from-blue-100 via-sky-100 to-indigo-100 min-h-screen flex flex-col justify-between p-4">
+
+  <!-- Container Box -->
+  <div class="max-w-4xl w-full mx-auto bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border border-white/50 overflow-hidden flex flex-col my-auto">
+
+    <!-- Header -->
+    <header class="bg-blue-400 text-white p-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-blue-100">
+      <div class="flex items-center gap-3 text-center sm:text-left">
+        <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl shadow-inner">
+          <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Portal de Evaluaciones</h1>
+          <p class="text-xs text-blue-100 font-medium">Recursos Humanos &bull; Selección de Talento</p>
+        </div>
+      </div>
+      <div id="status-bar" class="hidden text-xs font-bold bg-white/20 text-white px-3 py-1.5 rounded-full flex items-center gap-2">
+        <i class="fa-solid fa-user-clock"></i> <span id="current-candidate-display">Nombre</span>
+      </div>
+    </header>
+
+    <!-- MAIN BODY SECTIONS -->
+    <div class="p-6 md:p-8 flex-1">
+
+      <!-- STEP 1: SELECT CANDIDATE NAME (Bienvenida) -->
+      <section id="step-select-candidate" class="space-y-6">
+        <div class="text-center max-w-xl mx-auto space-y-3">
+          <span class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold text-xs uppercase tracking-wider">¡Bienvenido!</span>
+          <h2 class="text-2xl font-bold text-gray-800">Inicia tu Proceso de Selección</h2>
+          <p class="text-sm text-gray-500">
+            Por favor, busca tu nombre completo en la lista que habilitó el equipo de Recursos Humanos para comenzar tu examen.
+          </p>
+        </div>
+
+        <!-- Candidate list select box -->
+        <div class="max-w-md mx-auto space-y-4 pt-4">
+          <div>
+            <label class="block text-gray-600 text-sm font-semibold mb-2" for="select-cand">
+              Selecciona tu Nombre:
+            </label>
+            <select
+              id="select-cand"
+              class="w-full px-4 py-3 rounded-2xl border border-blue-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm transition font-semibold text-gray-700"
+            >
+              <option value="">Cargando candidatos habilitados...</option>
+            </select>
+          </div>
+
+          <div id="no-candidates-alert" class="hidden bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3 text-xs text-amber-800">
+            <i class="fa-solid fa-circle-exclamation text-base mt-0.5"></i>
+            <div>
+              <strong>¿No encuentras tu nombre?</strong><br>
+              Pídele al encargado de Recursos Humanos en tu oficina que te habilite en su panel para que aparezcas aquí de inmediato.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="btn-confirm-cand"
+            class="w-full py-4 bg-blue-400 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:shadow-blue-300 transition duration-300 flex items-center justify-center gap-2"
+          >
+            Comenzar Proceso <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 2: DYNAMIC GENERAL PERSONAL INFORMATION FORM -->
+      <section id="step-info-form" class="hidden space-y-6">
+        <div class="border-b border-blue-100 pb-3 mb-4">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-regular fa-file-lines mr-2 text-blue-400"></i>Formulario de Registro</h2>
+          <p class="text-xs text-gray-500">Ingresa tus datos personales requeridos por Recursos Humanos para poder avanzar.</p>
+        </div>
+
+        <form id="cand-info-form" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Dynamically populated from registration_forms table -->
+          <div id="dynamic-form-fields" class="grid grid-cols-1 md:grid-cols-2 gap-6 md:col-span-2">
+            <!-- Rendered by JS -->
+          </div>
+
+          <div class="md:col-span-2 flex justify-end pt-4 border-t border-blue-50">
+            <button
+              type="submit"
+              class="px-8 py-3.5 bg-blue-400 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-100 transition duration-300"
+            >
+              Continuar al Examen Psicométrico <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- STEP 3: PSYCHOMETRIC EXAM VIEW -->
+      <section id="step-psychometric" class="hidden space-y-6">
+        <div class="border-b border-blue-100 pb-3 flex items-center justify-between">
+          <div>
+            <span id="psy-header-tag" class="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Parte 1</span>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-brain mr-2 text-blue-400 animate-pulse"></i>Evaluación Psicométrica General</h2>
+            <p class="text-xs text-gray-400">Esta evaluación es la misma para todas las vacantes. Elige con honestidad.</p>
+          </div>
+          <div class="text-right hidden sm:block">
+            <span id="psy-progress-text" class="text-xs font-bold text-blue-400">0 / 0 Respondidas</span>
+          </div>
+        </div>
+
+        <div id="psy-questions-container" class="space-y-6 max-h-[50vh] overflow-y-auto custom-scroll pr-2">
+          <!-- Dynamic questions -->
+        </div>
+
+        <div class="flex items-center justify-between pt-4 border-t border-blue-100">
+          <span class="text-xs text-gray-400"><i class="fa-solid fa-circle-info"></i> Responde todas las preguntas para poder avanzar.</span>
+          <button
+            type="button"
+            id="btn-submit-psy"
+            class="px-8 py-3.5 bg-blue-400 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg transition duration-300"
+          >
+            Guardar y Siguiente Examen <i class="fa-solid fa-chevron-right ml-1"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 4: TECHNICAL / VACANCY SPECIFIC EXAM VIEW -->
+      <section id="step-technical" class="hidden space-y-6">
+        <div class="border-b border-blue-100 pb-3 flex items-center justify-between">
+          <div>
+            <span id="tech-header-tag" class="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Examen Técnico</span>
+            <h2 class="text-xl font-bold text-gray-800" id="tech-exam-title"><i class="fa-solid fa-award mr-2 text-indigo-400"></i>Examen Profesional</h2>
+            <p class="text-xs text-gray-400" id="tech-exam-desc">Evaluación asignada de acuerdo a la vacante seleccionada.</p>
+          </div>
+          <div class="text-right hidden sm:block">
+            <span id="tech-progress-text" class="text-xs font-bold text-blue-400">0 / 0 Respondidas</span>
+          </div>
+        </div>
+
+        <div id="tech-questions-container" class="space-y-6 max-h-[50vh] overflow-y-auto custom-scroll pr-2">
+          <!-- Dynamic technical questions -->
+        </div>
+
+        <div class="flex items-center justify-between pt-4 border-t border-blue-100">
+          <span class="text-xs text-gray-400"><i class="fa-solid fa-flag-checkered text-indigo-400"></i> Al presionar Siguiente, tus respuestas se guardarán.</span>
+          <button
+            type="button"
+            id="btn-submit-tech"
+            class="px-8 py-3.5 bg-emerald-400 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-lg shadow-emerald-100 transition duration-300"
+          >
+            Continuar Examen <i class="fa-solid fa-circle-check ml-1"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 5: FINAL CONFIRMATION / THANK YOU PAGE -->
+      <section id="step-completed" class="hidden space-y-6 text-center py-10 max-w-xl mx-auto">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full mb-4 shadow-inner animate-bounce">
+          <i class="fa-solid fa-check text-4xl"></i>
+        </div>
+
+        <h2 class="text-3xl font-extrabold text-gray-800">¡Evaluación Finalizada con Éxito!</h2>
+        <p class="text-sm text-gray-500">
+          Tus respuestas y datos de contacto han sido enviados correctamente al equipo de Recursos Humanos. El encargado te indicará cuáles son los siguientes pasos de tu proceso.
+        </p>
+
+        <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100/50 text-xs text-blue-700 font-semibold">
+          Puedes retirarte de este equipo. Tus datos han sido resguardados de forma segura.
+        </div>
+
+        <div class="pt-6">
+          <button
+            type="button"
+            id="btn-restart"
+            class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-xs transition"
+          >
+            Volver a la Página de Inicio
+          </button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Footer containing styled Login button -->
+  <footer class="max-w-4xl w-full mx-auto p-4 flex items-center justify-between gap-4 mt-6 text-xs text-gray-400">
+    <div>&copy; 2025 Recursos Humanos Inc.</div>
+    <div>
+      <a href="login.html" class="px-5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-2xl transition flex items-center gap-1.5 shadow-sm border border-blue-100/50">
+        <i class="fa-solid fa-right-to-bracket text-xs"></i> Iniciar Sesión (Personal Interno)
+      </a>
+    </div>
+  </footer>
+
+  <script src="js/supabase.js"></script>
+  <script src="js/candidate.js"></script>
+</body>
+</html>

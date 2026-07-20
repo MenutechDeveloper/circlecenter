@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Administrativo - Control Central RH</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts for friendly, beautiful, modern look -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Quicksand', sans-serif;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(239, 246, 255, 1);
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(147, 197, 253, 0.5);
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(147, 197, 253, 0.8);
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 min-h-screen flex flex-col justify-between">
+
+  <!-- Header / Navigation Bar -->
+  <header class="bg-white/80 backdrop-blur-md border-b border-blue-100 shadow-sm sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-md">
+          <i class="fa-solid fa-users-gear text-lg"></i>
+        </div>
+        <div>
+          <span class="text-xs font-bold text-blue-400 tracking-wider uppercase block">Administrador</span>
+          <h1 class="text-xl font-bold text-gray-800">Sistema Psicometría y Vacantes</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-sm font-semibold text-gray-600 hidden md:inline">
+          <i class="fa-regular fa-user mr-1 text-blue-400"></i> Hola, <strong id="admin-name">Frank</strong>
+        </span>
+        <button id="logout-btn" class="px-4 py-2 text-sm font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition duration-300 flex items-center gap-2">
+          <i class="fa-solid fa-power-off"></i> <span class="hidden sm:inline">Cerrar Sesión</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout with 2 columns: Hub Menu & Active Waiting List -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+    <!-- LEFT & CENTER: HUB MENU & CANDIDATE REGISTRATION -->
+    <div class="lg:col-span-2 space-y-8">
+
+      <!-- Hub Navigation Grid (Modular Sections Access) Simplified -->
+      <div class="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm space-y-4">
+        <div class="border-b border-blue-100 pb-3">
+          <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-cubes mr-2 text-blue-400"></i>Módulos Administrativos</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Modulo Examenes -->
+          <a href="admin_exams.html" class="p-4 bg-blue-50/50 hover:bg-blue-100/50 rounded-2xl border border-blue-100/50 transition duration-300 flex items-center gap-4 group">
+            <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-lg shadow-sm shrink-0 group-hover:scale-105 transition">
+              <i class="fa-solid fa-file-signature"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-800 text-base group-hover:text-blue-600 transition">Exámenes</h3>
+            </div>
+          </a>
+
+          <!-- Modulo Formulario Dinamico (Registros) -->
+          <a href="admin_forms.html" class="p-4 bg-sky-50/50 hover:bg-sky-100/50 rounded-2xl border border-sky-100/50 transition duration-300 flex items-center gap-4 group">
+            <div class="w-12 h-12 bg-sky-100 text-sky-600 rounded-xl flex items-center justify-center text-lg shadow-sm shrink-0 group-hover:scale-105 transition">
+              <i class="fa-solid fa-list-check"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-800 text-base group-hover:text-sky-600 transition">Registros</h3>
+            </div>
+          </a>
+
+          <!-- Modulo Resultados y Perfiles (Perfiles) -->
+          <a href="admin_results.html" class="p-4 bg-indigo-50/50 hover:bg-indigo-100/50 rounded-2xl border border-indigo-100/50 transition duration-300 flex items-center gap-4 group">
+            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-lg shadow-sm shrink-0 group-hover:scale-105 transition">
+              <i class="fa-solid fa-chart-pie"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-800 text-base group-hover:text-indigo-600 transition">Perfiles</h3>
+            </div>
+          </a>
+
+          <!-- Modulo Usuarios de la Empresa (Usuarios) -->
+          <a href="admin_company_users.html" class="p-4 bg-emerald-50/50 hover:bg-emerald-100/50 rounded-2xl border border-emerald-100/50 transition duration-300 flex items-center gap-4 group">
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-lg shadow-sm shrink-0 group-hover:scale-105 transition">
+              <i class="fa-solid fa-building-user"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-800 text-base group-hover:text-emerald-600 transition">Usuarios</h3>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Candidate Activator (Habilitar Nuevo Candidato) -->
+      <div class="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm space-y-4">
+        <div class="border-b border-blue-100 pb-3">
+          <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-pen mr-2 text-blue-400"></i>Habilitar Nuevo Candidato</h2>
+          <p class="text-xs text-gray-500">Registra un aspirante para que pueda iniciar sus evaluaciones.</p>
+        </div>
+
+        <!-- Alert dynamic box -->
+        <div id="alert-box" class="hidden bg-emerald-100 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center justify-between text-sm shadow-sm">
+          <span id="alert-msg">Candidato registrado con éxito.</span>
+          <button onclick="document.getElementById('alert-box').classList.add('hidden')" class="hover:scale-110 transition"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <form id="candidate-form" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-gray-600 text-sm font-semibold mb-1" for="cand-name">
+                Nombre del Candidato
+              </label>
+              <input
+                id="cand-name"
+                type="text"
+                required
+                class="w-full px-4 py-3 rounded-2xl border border-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm transition bg-blue-50/10"
+              >
+            </div>
+
+            <div>
+              <label class="block text-gray-600 text-sm font-semibold mb-1">
+                Asignar Examen
+              </label>
+              <div class="relative">
+                <!-- Dropdown Trigger Button -->
+                <button
+                  type="button"
+                  id="cand-exams-dropdown-btn"
+                  class="w-full px-4 py-3 rounded-2xl border border-blue-100 bg-white flex justify-between items-center text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition duration-200"
+                >
+                  <span id="selected-exams-text">-- Seleccionar Examen --</span>
+                  <i class="fa-solid fa-chevron-down text-blue-400 text-xs transition duration-200" id="dropdown-chevron"></i>
+                </button>
+                <!-- Dropdown Menu -->
+                <div
+                  id="cand-exams-dropdown-menu"
+                  class="hidden absolute left-0 right-0 z-50 mt-1.5 bg-white border border-blue-100 rounded-2xl shadow-xl max-h-48 overflow-y-auto custom-scroll p-2 space-y-1"
+                >
+                  <!-- Dynamically populated options list -->
+                  <div class="text-center py-4 text-xs text-gray-400">Cargando exámenes...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full py-4 bg-blue-400 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:shadow-blue-300 transition duration-300 flex items-center justify-center gap-2"
+          >
+            <i class="fa-solid fa-circle-plus"></i> Registrar y Habilitar Acceso
+          </button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: THE ACTIVE CANDIDATES QUEUE (LISTA DE ESPERA) -->
+    <div class="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-white shadow-sm flex flex-col h-[500px] lg:h-auto">
+      <div class="border-b border-blue-100 pb-3 mb-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-hourglass-half mr-2 text-blue-400 animate-spin"></i>Candidatos Activos</h2>
+          <p class="text-xs text-gray-500">Pendientes por iniciar o terminar el examen. Desaparecerán una vez completen.</p>
+        </div>
+        <button id="refresh-candidates-btn" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition duration-300" title="Actualizar lista">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scroll pr-1">
+        <div id="pending-candidates-list" class="space-y-3">
+          <!-- Dynamically populated -->
+          <div class="text-center py-12 text-gray-400">
+            <i class="fa-regular fa-folder-open text-3xl mb-2 block text-blue-200"></i>
+            Cargando lista de espera...
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="bg-white border-t border-blue-100 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-400">
+      &copy; 2025 Recursos Humanos Inc. Todos los derechos reservados.
+    </div>
+  </footer>
+
+  <script src="js/supabase.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

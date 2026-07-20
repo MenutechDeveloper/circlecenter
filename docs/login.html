@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión - Control RH</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Quicksand', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-tr from-blue-100 via-sky-100 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-md bg-white/80 backdrop-blur-md rounded-3xl shadow-xl border border-white/50 p-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl mb-4 shadow-inner">
+        <i id="header-icon" class="fa-solid fa-user-tie text-2xl"></i>
+      </div>
+      <h1 id="login-title" class="text-3xl font-bold text-gray-800">Recursos Humanos</h1>
+      <p id="login-subtitle" class="text-gray-500 mt-2">Acceso Administrativo al Panel</p>
+    </div>
+
+    <!-- Alert dynamic box -->
+    <div id="error-alert" class="hidden mb-6 bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-2xl flex items-center gap-2 text-sm">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="error-msg">Usuario o contraseña incorrectos.</span>
+    </div>
+
+    <!-- Success dynamic box -->
+    <div id="success-alert" class="hidden mb-6 bg-emerald-100 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-2xl flex items-center gap-2 text-sm">
+      <i class="fa-solid fa-circle-check"></i>
+      <span id="success-msg">Operación exitosa.</span>
+    </div>
+
+    <!-- Login Form -->
+    <form id="login-form" class="space-y-6">
+      <div>
+        <label id="username-label" class="block text-gray-600 text-sm font-semibold mb-2" for="username">
+          <i class="fa-regular fa-envelope mr-1 text-blue-400"></i> Correo Electrónico
+        </label>
+        <input
+          id="username"
+          type="email"
+          required
+          placeholder="ejemplo@correo.com"
+          class="w-full px-5 py-3 rounded-2xl border border-blue-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
+        >
+      </div>
+
+      <div>
+        <label class="block text-gray-600 text-sm font-semibold mb-2" for="password">
+          <i class="fa-solid fa-lock mr-1 text-blue-400"></i> Contraseña
+        </label>
+        <div class="relative">
+          <input
+            id="password"
+            type="password"
+            required
+            class="w-full px-5 py-3 rounded-2xl border border-blue-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
+          >
+          <button
+            type="button"
+            id="toggle-password"
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 focus:outline-none"
+          >
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        id="submit-btn"
+        class="w-full py-4 bg-blue-400 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all duration-300 transform active:scale-[0.98]"
+      >
+        Ingresar al Panel <i class="fa-solid fa-arrow-right ml-2"></i>
+      </button>
+    </form>
+
+    <!-- Registration Toggle -->
+    <div class="mt-4 text-center text-xs text-gray-400">
+      <button type="button" id="toggle-auth-mode" class="text-blue-500 font-semibold hover:underline">Registrar nuevo administrador</button>
+    </div>
+
+    <!-- Footer link -->
+    <div class="mt-8 text-center text-xs text-gray-400">
+      ¿Eres candidato? <a href="rh.html" class="text-blue-500 font-semibold hover:underline">Volver al inicio de evaluaciones</a>
+    </div>
+  </div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Configuración de Supabase -->
+  <script src="js/supabase.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>
