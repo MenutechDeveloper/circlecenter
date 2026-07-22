@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         partHtml += `
           <div class="pt-2 space-y-1">
             <div class="flex justify-between items-start gap-4">
-              <span class="text-xs font-bold text-gray-700">${idx + 1}. ${q.text}</span>
+              <span class="text-xs font-bold text-gray-700">${idx + 1}. ${escapeHTML(q.text)}</span>
               ${badge}
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">

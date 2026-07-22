@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         partHtml += `
           <div class="space-y-1">
-            <span class="text-xs font-bold text-gray-700 block">Pregunta: ${q.text}</span>
+            <span class="text-xs font-bold text-gray-700 block">Pregunta: ${escapeHTML(q.text)}</span>
             ${widget}
           </div>
         `;
@@ -446,11 +446,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           let questionConsoleHtml = "";
           if (q.questionCode && q.questionCode.trim()) {
             questionConsoleHtml = `
-              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-400 max-h-48 mb-3 whitespace-pre-wrap relative shadow-inner">
+              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-300 max-h-80 overflow-y-auto mb-3 whitespace-pre-wrap relative shadow-inner">
                 <div class="flex items-center border-b border-slate-800 pb-1.5 mb-2 select-none">
                   <span class="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Consola</span>
                 </div>
-                <code>${escapeHTML(q.questionCode)}</code>
+                <code>${highlightCode(q.questionCode)}</code>
               </div>
             `;
           }
@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         partHtml += `
           <div class="space-y-1">
-            <span class="text-xs font-bold text-gray-700 block">Pregunta: ${q.text}</span>
+            <span class="text-xs font-bold text-gray-700 block">Pregunta: ${escapeHTML(q.text)}</span>
             ${widget}
           </div>
         `;
@@ -1776,6 +1776,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function highlightCode(code) {
+    if (!code) return "";
+    let escaped = escapeHTML(code);
+    // 1. Strings: green
+    escaped = escaped.replace(/(&quot;.*?&quot;|&#039;.*?&#039;|`.*?`)/g, '<span class="text-emerald-400">$1</span>');
+    // 2. Comments: gray/slate
+    escaped = escaped.replace(/(\/\/.*|#.*|&lt;!--[\s\S]*?--&gt;)/g, '<span class="text-slate-500">$1</span>');
+    // 3. Keywords / tags: pink/amber/purple
+    const keywords = /\b(const|let|var|function|return|if|else|for|while|import|from|class|select|from|where|order|by|insert|into|values|delete|update|set|and|or|true|false)\b/gi;
+    escaped = escaped.replace(keywords, '<span class="text-pink-400 font-bold">$1</span>');
+    // 4. HTML tags inside:
+    escaped = escaped.replace(/(&lt;\/?\w+.*?&gt;)/g, '<span class="text-amber-300 font-bold">$1</span>');
+    return escaped;
   }
 
   // Inicializar
