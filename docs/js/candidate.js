@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       let partHtml = `
         <div class="bg-blue-50/30 p-5 rounded-2xl border border-blue-100 shadow-sm space-y-4">
           <h3 class="text-sm font-bold text-blue-700 flex items-center gap-1.5 border-b border-blue-100 pb-2">
-            <i class="fa-solid fa-folder text-blue-400"></i> ${part.title}
+            ${part.title}
           </h3>
           <div class="space-y-4">
       `;
@@ -377,7 +377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       techHeaderTag.textContent = `Examen Técnico ${currentTechnicalExamIndex + 1} de ${assignedTechnicalExamsList.length}`;
     }
 
-    techExamTitle.innerHTML = `<i class="fa-solid fa-award mr-2 text-blue-400"></i>Examen Profesional: <span class="text-blue-600 font-extrabold">${exam.name}</span>`;
+    techExamTitle.innerHTML = `Examen: <span class="text-blue-600 font-extrabold">${exam.name}</span>`;
     techExamDesc.textContent = exam.description || "Evaluación práctica de profesión.";
 
     // Inicializar respuestas para este examen si no existen
@@ -399,7 +399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       let partHtml = `
         <div class="bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100/50 shadow-sm space-y-4">
           <h3 class="text-sm font-bold text-indigo-700 flex items-center gap-1.5 border-b border-indigo-100 pb-2">
-            <i class="fa-solid fa-folder text-indigo-400"></i> ${part.title}
+            ${part.title}
           </h3>
           <div class="space-y-4">
       `;
@@ -446,12 +446,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           let questionConsoleHtml = "";
           if (q.questionCode && q.questionCode.trim()) {
             questionConsoleHtml = `
-              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-400 overflow-x-auto max-h-48 mb-3 whitespace-pre relative shadow-inner">
-                <div class="flex items-center gap-1.5 border-b border-slate-800 pb-1.5 mb-2 select-none">
-                  <span class="w-2 h-2 rounded-full bg-red-400"></span>
-                  <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                  <span class="w-2 h-2 rounded-full bg-green-400"></span>
-                  <span class="ml-1 text-slate-500 text-[9px] uppercase font-bold tracking-wider">Consola de Pregunta</span>
+              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-400 max-h-48 mb-3 whitespace-pre-wrap relative shadow-inner">
+                <div class="flex items-center border-b border-slate-800 pb-1.5 mb-2 select-none">
+                  <span class="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Consola</span>
                 </div>
                 <code>${escapeHTML(q.questionCode)}</code>
               </div>
@@ -504,13 +501,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                       const uppercaseTab = tab.toUpperCase();
                       return `
                         <button type="button" class="tab-btn-${q.id} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 ${isActive ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}" data-tab="${tab}" data-q-id="${q.id}">
-                          <i class="fa-solid ${tab === 'html' ? 'fa-html5 text-orange-400' : tab === 'css' ? 'fa-css3-alt text-blue-400' : tab === 'js' ? 'fa-js text-yellow-400' : 'fa-database text-cyan-400'} mr-1"></i> ${uppercaseTab}
+                          ${uppercaseTab}
                         </button>
                       `;
                     }).join('')}
                   </div>
                   <div class="text-[9px] text-slate-400 font-bold uppercase tracking-wider bg-slate-950/60 px-2.5 py-1 rounded border border-slate-800">
-                    <i class="fa-solid fa-terminal text-indigo-400 mr-1"></i> Modo Programación
+                    Modo Programación
                   </div>
                 </div>
 
@@ -557,7 +554,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     <!-- Compile Button -->
                     <button type="button" id="btn-compile-${q.id}" class="btn-compile-class w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 transition duration-200" data-q-id="${q.id}">
-                      <i class="fa-solid fa-play"></i> Compilar y Guardar Código
+                      Compilar y Guardar Código
                     </button>
                   </div>
 
@@ -733,9 +730,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Actualizar texto del botón según si hay más exámenes después
     if (currentTechnicalExamIndex < assignedTechnicalExamsList.length - 1) {
-      btnSubmitTech.innerHTML = `Siguiente Examen (${currentTechnicalExamIndex + 2}/${assignedTechnicalExamsList.length}) <i class="fa-solid fa-chevron-right ml-1"></i>`;
+      btnSubmitTech.innerHTML = `Siguiente Examen (${currentTechnicalExamIndex + 2}/${assignedTechnicalExamsList.length})`;
     } else {
-      btnSubmitTech.innerHTML = `Finalizar Todo el Proceso <i class="fa-solid fa-circle-check ml-1"></i>`;
+      btnSubmitTech.innerHTML = `Finalizar Todo el Proceso`;
     }
 
     // Binds
