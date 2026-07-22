@@ -79,7 +79,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         lastActivePartIdx = partsData.length - 1;
       }
       addQuestionToPart(lastActivePartIdx, 'programacion');
-      showPastelAlert("¡Pregunta de tipo 'Programación' añadida con éxito a la sección activa!", "Modo Especial");
 
       // Cerrar sidebar después de agregar
       if (specialsSidebar) {
@@ -99,7 +98,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         lastActivePartIdx = partsData.length - 1;
       }
       addQuestionToPart(lastActivePartIdx, 'canvas');
-      showPastelAlert("¡Pregunta de tipo 'Lienzo Creativo (Canvas)' añadida con éxito a la sección activa!", "Modo Especial");
 
       // Cerrar sidebar después de agregar
       if (specialsSidebar) {
@@ -507,10 +505,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const respType = q.responseType || 'ide';
         extraHtml = `
           <div class="mt-2 text-[10px] text-indigo-600 bg-indigo-50 p-3 rounded-xl border border-indigo-100 space-y-3">
-            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-code text-indigo-500"></i> Pregunta de Programación Especial</span>
+            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-code text-indigo-500"></i> Pregunta de Programación</span>
 
             <div class="space-y-1">
-              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Código Inicial de la Pregunta (Opcional - Se mostrará en consola)</label>
+              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Código Inicial de la Pregunta</label>
               <textarea
                 class="q-question-code-input font-mono w-full px-3 py-2 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-sky-400 h-20 custom-scroll"
                 data-part-idx="${partIdx}"
@@ -520,7 +518,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
 
             <div class="space-y-1">
-              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Tipo de Respuesta del Candidato</label>
+              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Tipo de Respuesta</label>
               <select
                 class="q-response-type-select px-2 py-1.5 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-white w-full text-indigo-700 font-bold"
                 data-part-idx="${partIdx}"
@@ -585,24 +583,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       return `
-        <div class="p-3 bg-blue-50/20 rounded-xl border border-blue-100/30 relative space-y-2">
-          <button type="button" class="btn-delete-q absolute top-2 right-2 text-gray-400 hover:text-rose-500 transition" data-part-idx="${partIdx}" data-q-idx="${qIdx}" title="Borrar Pregunta">
-            <i class="fa-solid fa-xmark text-sm"></i>
-          </button>
+        <div class="p-5 bg-blue-50/30 rounded-2xl border border-blue-100/40 relative space-y-3 shadow-sm hover:shadow transition duration-200">
+          <!-- Move and Delete Actions -->
+          <div class="absolute top-3 right-3 flex items-center gap-2 text-gray-400">
+            <button type="button" class="btn-move-q-up p-1 hover:text-indigo-600 transition" data-part-idx="${partIdx}" data-q-idx="${qIdx}" title="Subir Pregunta (Reordenar)">
+              <i class="fa-solid fa-arrow-up text-xs"></i>
+            </button>
+            <button type="button" class="btn-move-q-down p-1 hover:text-indigo-600 transition" data-part-idx="${partIdx}" data-q-idx="${qIdx}" title="Bajar Pregunta (Reordenar)">
+              <i class="fa-solid fa-arrow-down text-xs"></i>
+            </button>
+            <button type="button" class="btn-delete-q p-1 hover:text-rose-500 transition ml-1" data-part-idx="${partIdx}" data-q-idx="${qIdx}" title="Borrar Pregunta">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
 
           <div>
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase ${
+            <div class="flex items-center gap-2 mb-1.5 select-none">
+              <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
                 q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : 'bg-indigo-100 text-indigo-800'
               }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : q.type === 'canvas' ? 'Canvas (Ilustrador)' : 'Programación'}</span>
-              <span class="text-[10px] text-gray-400">Pregunta ${qIdx + 1}</span>
+              <span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>
             </div>
             <input
               type="text"
               value="${q.text}"
-              class="q-text-input px-3 py-1.5 w-full border border-blue-100 focus:outline-none rounded-lg text-xs"
+              class="q-text-input px-4 py-2.5 w-full border border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded-xl text-sm font-semibold text-gray-800"
               data-part-idx="${partIdx}"
               data-q-idx="${qIdx}"
+              placeholder="Escribe el enunciado de la pregunta aquí..."
             >
           </div>
 
@@ -729,6 +737,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         const qIdx = btn.getAttribute('data-q-idx');
         partsData[partIdx].questions.splice(qIdx, 1);
         renderParts();
+      });
+    });
+
+    document.querySelectorAll('.btn-move-q-up').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const partIdx = parseInt(btn.getAttribute('data-part-idx'));
+        const qIdx = parseInt(btn.getAttribute('data-q-idx'));
+        if (qIdx > 0) {
+          const temp = partsData[partIdx].questions[qIdx];
+          partsData[partIdx].questions[qIdx] = partsData[partIdx].questions[qIdx - 1];
+          partsData[partIdx].questions[qIdx - 1] = temp;
+          renderParts();
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-move-q-down').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const partIdx = parseInt(btn.getAttribute('data-part-idx'));
+        const qIdx = parseInt(btn.getAttribute('data-q-idx'));
+        if (qIdx < partsData[partIdx].questions.length - 1) {
+          const temp = partsData[partIdx].questions[qIdx];
+          partsData[partIdx].questions[qIdx] = partsData[partIdx].questions[qIdx + 1];
+          partsData[partIdx].questions[qIdx + 1] = temp;
+          renderParts();
+        }
       });
     });
   }
