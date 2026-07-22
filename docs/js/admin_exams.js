@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const specialsSidebar = document.getElementById('specials-sidebar');
   const specialsToggleBtn = document.getElementById('specials-toggle-btn');
   const sidebarAddCanvasBtn = document.getElementById('sidebar-add-canvas');
+  const sidebarAddProgramacionBtn = document.getElementById('sidebar-add-programacion');
 
   if (specialsToggleBtn && specialsSidebar) {
     specialsToggleBtn.addEventListener('click', (e) => {
@@ -62,6 +63,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Cerrar sidebar al hacer click fuera
     document.addEventListener('click', (e) => {
       if (specialsSidebar && !specialsSidebar.contains(e.target) && !specialsToggleBtn.contains(e.target)) {
+        specialsSidebar.classList.remove('translate-x-0');
+        specialsSidebar.classList.add('-translate-x-[260px]');
+      }
+    });
+  }
+
+  if (sidebarAddProgramacionBtn) {
+    sidebarAddProgramacionBtn.addEventListener('click', () => {
+      if (partsData.length === 0) {
+        showPastelAlert("Por favor, agrega al menos una sección primero antes de insertar una pregunta especial.", "Aviso");
+        return;
+      }
+      if (lastActivePartIdx >= partsData.length) {
+        lastActivePartIdx = partsData.length - 1;
+      }
+      addQuestionToPart(lastActivePartIdx, 'programacion');
+      showPastelAlert("¡Pregunta de tipo 'Programación' añadida con éxito a la sección activa!", "Modo Especial");
+
+      // Cerrar sidebar después de agregar
+      if (specialsSidebar) {
         specialsSidebar.classList.remove('translate-x-0');
         specialsSidebar.classList.add('-translate-x-[260px]');
       }
@@ -482,6 +503,85 @@ document.addEventListener('DOMContentLoaded', async () => {
             <span class="text-gray-500 font-medium">El candidato dispondrá de un lienzo de dibujo a escala A4 con paleta de colores, trazos libres, círculos, rectángulos, estrellas, atajos de teclado (Ctrl+Z, Ctrl+C, Ctrl+V, Espacio para arrastrar y zoom de rueda) y un temporizador de 30 minutos. El diseño final se exportará como imagen para evaluación.</span>
           </div>
         `;
+      } else if (q.type === 'programacion') {
+        const respType = q.responseType || 'ide';
+        extraHtml = `
+          <div class="mt-2 text-[10px] text-indigo-600 bg-indigo-50 p-3 rounded-xl border border-indigo-100 space-y-3">
+            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-code text-indigo-500"></i> Pregunta de Programación Especial</span>
+
+            <div class="space-y-1">
+              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Código Inicial de la Pregunta (Opcional - Se mostrará en consola)</label>
+              <textarea
+                class="q-question-code-input font-mono w-full px-3 py-2 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-sky-400 h-20 custom-scroll"
+                data-part-idx="${partIdx}"
+                data-q-idx="${qIdx}"
+                placeholder="Escribe el código de la pregunta aquí (ej. esquema de tablas, plantilla o snippet)..."
+              >${q.questionCode || ''}</textarea>
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Tipo de Respuesta del Candidato</label>
+              <select
+                class="q-response-type-select px-2 py-1.5 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-white w-full text-indigo-700 font-bold"
+                data-part-idx="${partIdx}"
+                data-q-idx="${qIdx}"
+              >
+                <option value="ide" ${respType === 'ide' ? 'selected' : ''}>Código en Pestañas (IDE HTML/CSS/JS/SQL)</option>
+                <option value="multiple" ${respType === 'multiple' ? 'selected' : ''}>Opción Múltiple</option>
+                <option value="short" ${respType === 'short' ? 'selected' : ''}>Texto Abierto / Corto</option>
+              </select>
+            </div>
+
+            <div id="prog-details-container-${partIdx}-${qIdx}" class="space-y-2">
+              ${respType === 'multiple' ? `
+                <div class="grid grid-cols-2 gap-2">
+                  ${[0, 1, 2, 3].map(optIdx => `
+                    <div>
+                      <label class="text-[8px] text-gray-400 block font-semibold">Opción ${optIdx + 1}</label>
+                      <input
+                        type="text"
+                        value="${(q.options && q.options[optIdx]) || ''}"
+                        class="q-prog-opt-input w-full px-2 py-1 border border-indigo-100 focus:outline-none rounded-lg text-xs bg-white text-gray-700"
+                        data-part-idx="${partIdx}"
+                        data-q-idx="${qIdx}"
+                        data-opt-idx="${optIdx}"
+                      >
+                    </div>
+                  `).join('')}
+                </div>
+                <div>
+                  <label class="text-[9px] text-indigo-600 block font-bold">Opción Correcta</label>
+                  <select
+                    class="q-prog-correct-select px-2 py-1 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-white w-full mt-0.5"
+                    data-part-idx="${partIdx}"
+                    data-q-idx="${qIdx}"
+                  >
+                    <option value="">Selecciona la correcta...</option>
+                    ${[0, 1, 2, 3].map(optIdx => {
+                      const optVal = (q.options && q.options[optIdx]) || '';
+                      return `
+                        <option value="${optVal}" ${q.correct === optVal && q.correct ? 'selected' : ''}>
+                          ${optVal || `Opción ${optIdx + 1}`}
+                        </option>
+                      `;
+                    }).join('')}
+                  </select>
+                </div>
+              ` : `
+                <div>
+                  <label class="block text-[9px] font-bold text-indigo-500 uppercase">${respType === 'ide' ? 'Resultado / Output Esperado' : 'Respuesta Correcta'}</label>
+                  <textarea
+                    class="q-correct-code-input font-mono w-full px-3 py-1.5 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-emerald-400 h-16 custom-scroll"
+                    data-part-idx="${partIdx}"
+                    data-q-idx="${qIdx}"
+                    placeholder="${respType === 'ide' ? 'Escribe la respuesta esperada o el output compilado exacto...' : 'Escribe la respuesta exacta esperada...'}"
+                  >${q.correct || ''}</textarea>
+                </div>
+              `}
+            </div>
+
+          </div>
+        `;
       }
 
       return `
@@ -493,8 +593,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div>
             <div class="flex items-center gap-2 mb-1">
               <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase ${
-                q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'
-              }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : 'Canvas (Ilustrador)'}</span>
+                q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : 'bg-indigo-100 text-indigo-800'
+              }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : q.type === 'canvas' ? 'Canvas (Ilustrador)' : 'Programación'}</span>
               <span class="text-[10px] text-gray-400">Pregunta ${qIdx + 1}</span>
             </div>
             <input
@@ -514,13 +614,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function addQuestionToPart(partIdx, type) {
     const defaultOptions = type === 'multiple' ? ["", "", "", ""] : (type === 'boolean' ? ["Verdadero", "Falso"] : []);
-    partsData[partIdx].questions.push({
+    const qObj = {
       id: "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
       type: type,
       text: "",
       options: defaultOptions,
       correct: ""
-    });
+    };
+    if (type === 'programacion') {
+      qObj.questionCode = "";
+      qObj.responseType = "ide";
+    }
+    partsData[partIdx].questions.push(qObj);
     renderParts();
   }
 
@@ -530,6 +635,62 @@ document.addEventListener('DOMContentLoaded', async () => {
         const partIdx = e.target.getAttribute('data-part-idx');
         const qIdx = e.target.getAttribute('data-q-idx');
         partsData[partIdx].questions[qIdx].text = e.target.value;
+      });
+    });
+
+    document.querySelectorAll('.q-question-code-input').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const partIdx = e.target.getAttribute('data-part-idx');
+        const qIdx = e.target.getAttribute('data-q-idx');
+        partsData[partIdx].questions[qIdx].questionCode = e.target.value;
+      });
+    });
+
+    document.querySelectorAll('.q-correct-code-input').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const partIdx = e.target.getAttribute('data-part-idx');
+        const qIdx = e.target.getAttribute('data-q-idx');
+        partsData[partIdx].questions[qIdx].correct = e.target.value;
+      });
+    });
+
+    document.querySelectorAll('.q-response-type-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const partIdx = select.getAttribute('data-part-idx');
+        const qIdx = select.getAttribute('data-q-idx');
+        partsData[partIdx].questions[qIdx].responseType = e.target.value;
+        if (e.target.value === 'multiple' && (!partsData[partIdx].questions[qIdx].options || partsData[partIdx].questions[qIdx].options.length === 0)) {
+          partsData[partIdx].questions[qIdx].options = ["", "", "", ""];
+        }
+        renderParts();
+      });
+    });
+
+    document.querySelectorAll('.q-prog-opt-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const partIdx = input.getAttribute('data-part-idx');
+        const qIdx = input.getAttribute('data-q-idx');
+        const optIdx = input.getAttribute('data-opt-idx');
+        partsData[partIdx].questions[qIdx].options[optIdx] = input.value;
+
+        const correctSelect = document.querySelector(`.q-prog-correct-select[data-part-idx="${partIdx}"][data-q-idx="${qIdx}"]`);
+        if (correctSelect) {
+          const currentVal = correctSelect.value;
+          correctSelect.innerHTML = '<option value="">Selecciona la correcta...</option>';
+          partsData[partIdx].questions[qIdx].options.forEach((opt, idx) => {
+            const optLabel = opt || `Opción ${idx + 1}`;
+            const selectedStr = currentVal === opt && opt ? 'selected' : '';
+            correctSelect.innerHTML += `<option value="${opt}" ${selectedStr}>${optLabel}</option>`;
+          });
+        }
+      });
+    });
+
+    document.querySelectorAll('.q-prog-correct-select').forEach(select => {
+      select.addEventListener('change', () => {
+        const partIdx = select.getAttribute('data-part-idx');
+        const qIdx = select.getAttribute('data-q-idx');
+        partsData[partIdx].questions[qIdx].correct = select.value;
       });
     });
 

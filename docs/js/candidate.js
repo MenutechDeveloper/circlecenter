@@ -440,6 +440,154 @@ document.addEventListener('DOMContentLoaded', async () => {
           widget = `
             <textarea rows="3" class="tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none" data-q-id="${q.id}">${savedVal}</textarea>
           `;
+        } else if (q.type === 'programacion') {
+          const respType = q.responseType || 'ide';
+
+          let questionConsoleHtml = "";
+          if (q.questionCode && q.questionCode.trim()) {
+            questionConsoleHtml = `
+              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-400 overflow-x-auto max-h-48 mb-3 whitespace-pre relative shadow-inner">
+                <div class="flex items-center gap-1.5 border-b border-slate-800 pb-1.5 mb-2 select-none">
+                  <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                  <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                  <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                  <span class="ml-1 text-slate-500 text-[9px] uppercase font-bold tracking-wider">Consola de Pregunta</span>
+                </div>
+                <code>${escapeHTML(q.questionCode)}</code>
+              </div>
+            `;
+          }
+
+          if (respType === 'multiple') {
+            widget = `
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+                ${questionConsoleHtml}
+
+                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Selecciona la opción correcta:</span>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                    ${(q.options || []).map(opt => {
+                      const checked = savedVal === opt ? 'checked' : '';
+                      return `
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-900 cursor-pointer transition text-xs font-semibold text-slate-300">
+                          <input type="radio" name="tech_q_${q.id}" value="${opt}" ${checked} class="tech-radio-input focus:ring-blue-400 text-blue-500 bg-slate-950 border-slate-800" data-q-id="${q.id}">
+                          <span>${escapeHTML(opt)}</span>
+                        </label>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              </div>
+            `;
+          } else if (respType === 'short') {
+            widget = `
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+                ${questionConsoleHtml}
+
+                <div class="space-y-1">
+                  <label class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Escribe tu respuesta:</label>
+                  <textarea rows="3" class="tech-textarea-input w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-indigo-500 focus:outline-none custom-scroll" data-q-id="${q.id}" placeholder="Escribe tu código o respuesta aquí...">${savedVal}</textarea>
+                </div>
+              </div>
+            `;
+          } else {
+            const savedObj = (typeof savedVal === 'object' && savedVal) ? savedVal : { html: "", css: "", js: "", sql: "", compiledOutput: "", activeTab: "html" };
+            widget = `
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+                ${questionConsoleHtml}
+
+                <!-- Tab selector -->
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                  <div class="flex gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
+                    ${['html', 'css', 'js', 'sql'].map(tab => {
+                      const isActive = savedObj.activeTab === tab;
+                      const uppercaseTab = tab.toUpperCase();
+                      return `
+                        <button type="button" class="tab-btn-${q.id} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 ${isActive ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}" data-tab="${tab}" data-q-id="${q.id}">
+                          <i class="fa-solid ${tab === 'html' ? 'fa-html5 text-orange-400' : tab === 'css' ? 'fa-css3-alt text-blue-400' : tab === 'js' ? 'fa-js text-yellow-400' : 'fa-database text-cyan-400'} mr-1"></i> ${uppercaseTab}
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                  <div class="text-[9px] text-slate-400 font-bold uppercase tracking-wider bg-slate-950/60 px-2.5 py-1 rounded border border-slate-800">
+                    <i class="fa-solid fa-terminal text-indigo-400 mr-1"></i> Modo Programación
+                  </div>
+                </div>
+
+                <!-- Editors and Preview Workspace Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                  <!-- Code Editors Column -->
+                  <div class="space-y-3">
+                    <!-- HTML Editor -->
+                    <div class="editor-pane-${q.id} ${savedObj.activeTab === 'html' ? '' : 'hidden'}" id="pane-html-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Código HTML5</span>
+                        <span class="text-orange-400">index.html</span>
+                      </div>
+                      <textarea id="code-html-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="<!-- Escribe tu HTML aquí -->">${escapeHTML(savedObj.html || '')}</textarea>
+                    </div>
+
+                    <!-- CSS Editor -->
+                    <div class="editor-pane-${q.id} ${savedObj.activeTab === 'css' ? '' : 'hidden'}" id="pane-css-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Código CSS3</span>
+                        <span class="text-blue-400">styles.css</span>
+                      </div>
+                      <textarea id="code-css-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="/* Escribe tu CSS aquí */">${escapeHTML(savedObj.css || '')}</textarea>
+                    </div>
+
+                    <!-- JS Editor -->
+                    <div class="editor-pane-${q.id} ${savedObj.activeTab === 'js' ? '' : 'hidden'}" id="pane-js-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Código JavaScript</span>
+                        <span class="text-yellow-400">app.js</span>
+                      </div>
+                      <textarea id="code-js-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="// Escribe tu JS aquí (usa console.log para ver resultados)">${escapeHTML(savedObj.js || '')}</textarea>
+                    </div>
+
+                    <!-- SQL Editor -->
+                    <div class="editor-pane-${q.id} ${savedObj.activeTab === 'sql' ? '' : 'hidden'}" id="pane-sql-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Consulta SQL (Tablas: users, vacancies)</span>
+                        <span class="text-cyan-400">query.sql</span>
+                      </div>
+                      <textarea id="code-sql-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="SELECT * FROM users; -- Prueba aquí tus consultas SQL">${escapeHTML(savedObj.sql || '')}</textarea>
+                    </div>
+
+                    <!-- Compile Button -->
+                    <button type="button" id="btn-compile-${q.id}" class="btn-compile-class w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 transition duration-200" data-q-id="${q.id}">
+                      <i class="fa-solid fa-play"></i> Compilar y Guardar Código
+                    </button>
+                  </div>
+
+                  <!-- Live Preview / Terminal Column -->
+                  <div class="space-y-3 flex flex-col justify-between">
+                    <!-- Output Console -->
+                    <div class="flex-1 flex flex-col min-h-0">
+                      <span class="text-[10px] text-slate-400 font-semibold mb-1 block">Consola de Ejecución</span>
+                      <div class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-emerald-400 overflow-y-auto max-h-48 custom-scroll relative shadow-inner flex flex-col justify-between" style="min-height: 120px;">
+                        <pre id="output-console-${q.id}" class="whitespace-pre-wrap font-mono">${escapeHTML(savedObj.compiledOutput || 'Sube/Compila tu código para ver el resultado aquí...')}</pre>
+                        <div class="flex justify-between items-center text-[8px] text-slate-500 mt-2 pt-1 border-t border-slate-900 select-none">
+                          <span>Compilador V1.0.0</span>
+                          <span>Listo</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Live Web Preview Box (Only relevant for HTML/CSS/JS) -->
+                    <div class="h-28 flex flex-col min-h-0" id="preview-box-container-${q.id}">
+                      <span class="text-[10px] text-slate-400 font-semibold mb-1 block">Vista Previa Web</span>
+                      <div class="flex-1 bg-white rounded-xl overflow-hidden border border-slate-800 relative">
+                        <iframe id="preview-frame-${q.id}" class="w-full h-full bg-white block" sandbox="allow-scripts"></iframe>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            `;
+          }
         } else if (q.type === 'canvas') {
           widget = `
             <div class="illustrator-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 text-white relative select-none overflow-hidden" data-q-id="${q.id}">
@@ -577,6 +725,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       part.questions.forEach(q => {
         if (q.type === 'canvas') {
           initIllustratorCanvas(q.id, exam.id);
+        } else if (q.type === 'programacion') {
+          initProgramacionIDE(q.id, exam.id, q);
         }
       });
     });
@@ -677,7 +827,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             q.userAnswer = examAnswers[q.id] || "";
             if (q.type !== 'short') {
               consolidatedMaxScore++;
-              if (q.userAnswer === q.correct) {
+              let isCorrect = false;
+              if (q.type === 'programacion') {
+                const ansObj = typeof q.userAnswer === 'object' ? q.userAnswer : null;
+                if (ansObj) {
+                  const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
+                  const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
+                  const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
+                  const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
+                  const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
+
+                  isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
+                } else {
+                  isCorrect = (String(q.userAnswer).trim() === String(q.correct || "").trim());
+                }
+              } else {
+                isCorrect = (q.userAnswer === q.correct);
+              }
+
+              if (isCorrect) {
                 consolidatedScore++;
               }
             }
@@ -1319,6 +1487,298 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Dibujar inicialización
     drawWorkspace();
+  }
+
+  function initProgramacionIDE(qId, examId, q) {
+    if (q.responseType && q.responseType !== 'ide') {
+      return;
+    }
+    const htmlCodeArea = document.getElementById(`code-html-${qId}`);
+    const cssCodeArea = document.getElementById(`code-css-${qId}`);
+    const jsCodeArea = document.getElementById(`code-js-${qId}`);
+    const sqlCodeArea = document.getElementById(`code-sql-${qId}`);
+    const compileBtn = document.getElementById(`btn-compile-${qId}`);
+    const consoleOutput = document.getElementById(`output-console-${qId}`);
+    const previewFrame = document.getElementById(`preview-frame-${qId}`);
+
+    // Asegurar estructura local en respuestas si no existe
+    if (!technicalAnswersByExam[examId]) {
+      technicalAnswersByExam[examId] = {};
+    }
+
+    let activeTab = "html"; // Default active tab
+
+    // Manejar clics de pestañas
+    document.querySelectorAll(`.tab-btn-${qId}`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const selectedTab = btn.getAttribute('data-tab');
+        activeTab = selectedTab;
+
+        // Reset tab buttons style
+        document.querySelectorAll(`.tab-btn-${qId}`).forEach(b => {
+          b.className = `tab-btn-${qId} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900`;
+        });
+        btn.className = `tab-btn-${qId} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 bg-indigo-600 text-white shadow`;
+
+        // Hide all editor panes and show active
+        document.querySelectorAll(`.editor-pane-${qId}`).forEach(pane => {
+          pane.classList.add('hidden');
+        });
+        const activePane = document.getElementById(`pane-${selectedTab}-${qId}`);
+        if (activePane) activePane.classList.remove('hidden');
+
+        saveCurrentCodeState();
+      });
+    });
+
+    function saveCurrentCodeState(compiledOutputValue = "") {
+      const htmlVal = htmlCodeArea ? htmlCodeArea.value : "";
+      const cssVal = cssCodeArea ? cssCodeArea.value : "";
+      const jsVal = jsCodeArea ? jsCodeArea.value : "";
+      const sqlVal = sqlCodeArea ? sqlCodeArea.value : "";
+
+      const currentAnswers = technicalAnswersByExam[examId] || {};
+      const savedObj = (typeof currentAnswers[qId] === 'object' && currentAnswers[qId]) ? currentAnswers[qId] : {};
+
+      const newAnswerObj = {
+        html: htmlVal,
+        css: cssVal,
+        js: jsVal,
+        sql: sqlVal,
+        compiledOutput: compiledOutputValue || savedObj.compiledOutput || "",
+        activeTab: activeTab
+      };
+
+      technicalAnswersByExam[examId][qId] = newAnswerObj;
+
+      const total = Object.keys(technicalAnswersByExam[examId]).length;
+      const qCount = assignedTechnicalExamsList[currentTechnicalExamIndex].parts.reduce((acc, p) => acc + p.questions.length, 0);
+      updateProgress(techProgressText, total, qCount);
+    }
+
+    // Al compilar
+    if (compileBtn) {
+      compileBtn.addEventListener('click', () => {
+        const htmlVal = htmlCodeArea ? htmlCodeArea.value : "";
+        const cssVal = cssCodeArea ? cssCodeArea.value : "";
+        const jsVal = jsCodeArea ? jsCodeArea.value : "";
+        const sqlVal = sqlCodeArea ? sqlCodeArea.value : "";
+
+        let outputStr = "";
+
+        if (activeTab === 'js') {
+          outputStr = executeJS(jsVal);
+        } else if (activeTab === 'sql') {
+          outputStr = executeMockSQL(sqlVal);
+        } else {
+          outputStr = "Páginas cargadas y compiladas con éxito.";
+        }
+
+        // Render preview if HTML/CSS/JS is modified
+        if (previewFrame) {
+          const combinedSrc = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>${cssVal}</style>
+            </head>
+            <body style="margin:8px;font-family:sans-serif;">
+              ${htmlVal}
+              <script>
+                try {
+                  ${jsVal}
+                } catch(e) {
+                  document.body.innerHTML += '<div style="color:red;font-family:monospace;margin-top:10px;">Error: ' + e.message + '</div>';
+                }
+              </script>
+            </body>
+            </html>
+          `;
+          previewFrame.srcdoc = combinedSrc;
+        }
+
+        if (consoleOutput) {
+          consoleOutput.textContent = outputStr;
+        }
+
+        saveCurrentCodeState(outputStr);
+        showPastelAlert("¡Código compilado y resultado guardado con éxito!", "Compilador");
+      });
+    }
+
+    // Inicializar el iframe preview si hay algo precargado
+    if (previewFrame && (htmlCodeArea?.value || cssCodeArea?.value || jsCodeArea?.value)) {
+      const combinedSrc = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>${cssCodeArea ? cssCodeArea.value : ""}</style>
+        </head>
+        <body style="margin:8px;font-family:sans-serif;">
+          ${htmlCodeArea ? htmlCodeArea.value : ""}
+          <script>
+            try {
+              ${jsCodeArea ? jsCodeArea.value : ""}
+            } catch(e) {}
+          </script>
+        </body>
+        </html>
+      `;
+      previewFrame.srcdoc = combinedSrc;
+    }
+
+    [htmlCodeArea, cssCodeArea, jsCodeArea, sqlCodeArea].forEach(area => {
+      if (area) {
+        area.addEventListener('input', () => {
+          saveCurrentCodeState();
+        });
+      }
+    });
+  }
+
+  function executeMockSQL(sql) {
+    const query = sql.trim().replace(/\s+/g, ' ');
+    // Simple parsing for SELECT queries
+    const selectMatch = query.match(/^SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?$/i);
+    if (!selectMatch) {
+      return "Error SQL: Solo consultas SELECT son soportadas en este compilador de simulación (Tablas: users, vacancies).";
+    }
+    const fieldsStr = selectMatch[1].trim();
+    const tableName = selectMatch[2].trim().toLowerCase();
+    const whereStr = selectMatch[3] ? selectMatch[3].trim() : null;
+    const orderByStr = selectMatch[4] ? selectMatch[4].trim() : null;
+
+    const mockDB = {
+      users: [
+        { id: 1, name: "Ana Lopez", role: "Developer", score: 95 },
+        { id: 2, name: "Carlos Ruiz", role: "Designer", score: 88 },
+        { id: 3, name: "Sofia Perez", role: "Developer", score: 92 }
+      ],
+      vacancies: [
+        { id: 1, title: "Frontend Dev", status: "Open" },
+        { id: 2, title: "UI/UX Designer", status: "Closed" }
+      ]
+    };
+
+    if (!mockDB[tableName]) {
+      return `Error SQL: Table "${tableName}" not found. Tables available: users, vacancies`;
+    }
+
+    let rows = [...mockDB[tableName]];
+
+    // Simple WHERE clause parsing
+    if (whereStr) {
+      const whereMatch = whereStr.match(/(\w+)\s*(=|!=|>|<)\s*(.+)/);
+      if (whereMatch) {
+        const field = whereMatch[1].trim();
+        const op = whereMatch[2].trim();
+        let val = whereMatch[3].trim().replace(/['"]/g, '');
+        rows = rows.filter(row => {
+          let rowVal = row[field];
+          if (typeof rowVal === 'number') {
+            val = parseFloat(val);
+          }
+          if (op === '=') return rowVal == val;
+          if (op === '!=') return rowVal != val;
+          if (op === '>') return rowVal > val;
+          if (op === '<') return rowVal < val;
+          return true;
+        });
+      }
+    }
+
+    // Simple ORDER BY
+    if (orderByStr) {
+      const orderParts = orderByStr.split(' ');
+      const field = orderParts[0].trim();
+      const desc = orderParts[1] && orderParts[1].toUpperCase() === 'DESC';
+      rows.sort((a, b) => {
+        if (a[field] < b[field]) return desc ? 1 : -1;
+        if (a[field] > b[field]) return desc ? -1 : 1;
+        return 0;
+      });
+    }
+
+    // Fields projection
+    let fields = fieldsStr.split(',').map(f => f.trim());
+    if (fields.length === 1 && fields[0] === '*') {
+      fields = Object.keys(mockDB[tableName][0]);
+    }
+
+    // Format table
+    const colWidths = {};
+    fields.forEach(f => {
+      colWidths[f] = f.length;
+      rows.forEach(r => {
+        const cellVal = String(r[f] !== undefined ? r[f] : '');
+        if (cellVal.length > colWidths[f]) {
+          colWidths[f] = cellVal.length;
+        }
+      });
+    });
+
+    let output = '';
+    let border = '+';
+    fields.forEach(f => {
+      border += '-'.repeat(colWidths[f] + 2) + '+';
+    });
+    output += border + '\n';
+
+    let headerRow = '|';
+    fields.forEach(f => {
+      headerRow += ' ' + f.toUpperCase().padEnd(colWidths[f]) + ' |';
+    });
+    output += headerRow + '\n' + border + '\n';
+
+    if (rows.length === 0) {
+      let emptyRow = '|';
+      const totalW = fields.reduce((sum, f) => sum + colWidths[f] + 3, 0) - 1;
+      emptyRow += ' No rows returned '.padEnd(totalW) + '|';
+      output += emptyRow + '\n' + border + '\n';
+    } else {
+      rows.forEach(r => {
+        let rowStr = '|';
+        fields.forEach(f => {
+          const cellVal = String(r[f] !== undefined ? r[f] : '');
+          rowStr += ' ' + cellVal.padEnd(colWidths[f]) + ' |';
+        });
+        rowStr += '\n';
+        output += rowStr;
+      });
+      output += border + '\n';
+    }
+
+    return output.trim();
+  }
+
+  function executeJS(code) {
+    let logs = [];
+    const originalLog = console.log;
+    console.log = function(...args) {
+      logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+    };
+
+    try {
+      const result = eval(code);
+      console.log = originalLog;
+      if (logs.length > 0) {
+        return logs.join('\n');
+      }
+      return result !== undefined ? String(result) : "Code executed successfully with no output.";
+    } catch (err) {
+      console.log = originalLog;
+      return `Error de Ejecución: ${err.message}`;
+    }
+  }
+
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
   // Inicializar

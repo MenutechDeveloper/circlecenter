@@ -185,17 +185,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       part.questions.forEach(q => {
         if (q.type !== 'short') {
           totalQuestions++;
-          const ans = (q.userAnswer || "").trim();
-          if (ans === "") {
-            empty++;
-          } else if (ans === q.correct) {
-            correct++;
+          if (q.type === 'programacion') {
+            const respType = q.responseType || 'ide';
+            if (respType === 'multiple' || respType === 'short') {
+              const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
+              if (ans === "") {
+                empty++;
+              } else if (ans === (q.correct || "").trim()) {
+                correct++;
+              } else {
+                incorrect++;
+              }
+            } else {
+              const ansObj = typeof q.userAnswer === 'object' ? q.userAnswer : null;
+              if (!ansObj) {
+                empty++;
+              } else {
+                const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
+                const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
+                const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
+                const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
+                const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
+
+                const isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
+                if (isCorrect) {
+                  correct++;
+                } else {
+                  incorrect++;
+                }
+              }
+            }
           } else {
-            incorrect++;
+            const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
+            if (ans === "") {
+              empty++;
+            } else if (ans === q.correct) {
+              correct++;
+            } else {
+              incorrect++;
+            }
           }
         } else {
           totalQuestions++;
-          if ((q.userAnswer || "").trim() === "") {
+          const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
+          if (ans === "") {
             empty++;
           }
         }
@@ -255,11 +288,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       part.questions.forEach((q, idx) => {
         const hasCorrect = q.type !== 'short' && q.type !== 'canvas';
-        const isCorrect = hasCorrect && (q.userAnswer === q.correct);
+        let isCorrect = hasCorrect && (q.userAnswer === q.correct);
+        if (q.type === 'programacion') {
+          const respType = q.responseType || 'ide';
+          if (respType === 'multiple' || respType === 'short') {
+            const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
+            isCorrect = (ans === (q.correct || "").trim());
+          } else {
+            const ansObj = typeof q.userAnswer === 'object' ? q.userAnswer : null;
+            if (ansObj) {
+              const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
+              const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
+              const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
+              const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
+              const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
+
+              isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
+            } else {
+              isCorrect = false;
+            }
+          }
+        }
 
         let badge = "";
         if (q.type === 'canvas') {
           badge = `<span class="text-[9px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-100"><i class="fa-solid fa-palette text-purple-500"></i> Diseño Canvas</span>`;
+        } else if (q.type === 'programacion') {
+          badge = `<span class="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100"><i class="fa-solid fa-code text-indigo-500"></i> Programación</span> ${isCorrect ? '<span class="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-check"></i> Correcto</span>' : '<span class="text-[9px] font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100"><i class="fa-solid fa-xmark"></i> Incorrecto</span>'}`;
         } else if (hasCorrect) {
           badge = isCorrect
             ? `<span class="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-check"></i> Correcto</span>`
@@ -288,6 +343,55 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <i class="fa-regular fa-image text-lg mb-1 block"></i> El candidato no realizó ningún dibujo en el lienzo.
               </div>
             `;
+          }
+        } else if (q.type === 'programacion') {
+          const respType = q.responseType || 'ide';
+          if (respType === 'multiple' || respType === 'short') {
+            answerWidget = `
+              <div class="col-span-2 space-y-2 mt-1">
+                <div class="bg-blue-50/20 p-2 rounded-lg border border-blue-100/20 text-xs">
+                  <strong class="text-[8px] text-gray-400 block uppercase">Respuesta del Aspirante (${respType === 'multiple' ? 'Opción Múltiple' : 'Respuesta Corta'})</strong>
+                  <span class="font-medium text-blue-900">${escapeHTML(q.userAnswer || 'Sin responder')}</span>
+                </div>
+                <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs">
+                  <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
+                  <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin solución esperada')}</pre>
+                </div>
+              </div>
+            `;
+          } else {
+            const ansObj = typeof q.userAnswer === 'object' ? q.userAnswer : null;
+            if (ansObj) {
+              const codeParts = [];
+              if (ansObj.html) codeParts.push(`HTML:\n${ansObj.html}`);
+              if (ansObj.css) codeParts.push(`CSS:\n${ansObj.css}`);
+              if (ansObj.js) codeParts.push(`JS:\n${ansObj.js}`);
+              if (ansObj.sql) codeParts.push(`SQL:\n${ansObj.sql}`);
+
+              const fullCode = codeParts.join('\n\n');
+              answerWidget = `
+                <div class="col-span-2 space-y-2 mt-1">
+                  <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-white font-mono text-xs shadow-inner">
+                    <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Código Escrito por el Candidato</span>
+                    <pre class="overflow-x-auto max-h-48 whitespace-pre-wrap custom-scroll text-sky-300">${escapeHTML(fullCode || 'Sin código')}</pre>
+                  </div>
+                  <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 text-emerald-400 font-mono text-xs shadow-inner">
+                    <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Resultado de la Compilación</span>
+                    <pre class="overflow-x-auto max-h-32 whitespace-pre-wrap custom-scroll">${escapeHTML(ansObj.compiledOutput || 'Sin compilar')}</pre>
+                  </div>
+                  <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs col-span-2">
+                    <strong class="text-[8px] text-gray-400 block uppercase">Clave/Resultado Esperado por el Reclutador</strong>
+                    <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin resultado esperado')}</pre>
+                  </div>
+                </div>
+              `;
+            } else {
+              answerWidget = `
+                <div class="col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 text-center text-xs text-slate-400 mt-1">
+                  El candidato no guardó ni compiló código.
+                </div>
+              `;
+            }
           }
         } else {
           answerWidget = `
@@ -389,6 +493,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   resultsSearch.addEventListener('input', renderResults);
   filterVacancy.addEventListener('change', renderResults);
   refreshResultsBtn.addEventListener('click', loadResults);
+
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
   // Inicializar
   await loadResults();
