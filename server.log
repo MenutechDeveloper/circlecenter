@@ -23,3 +23,8 @@
 127.0.0.1 - - [08/Aug/2026 07:28:56] "GET /js/login.js HTTP/1.1" 200 -
 127.0.0.1 - - [08/Aug/2026 07:28:58] "GET /admin_exams.html HTTP/1.1" 200 -
 127.0.0.1 - - [08/Aug/2026 07:28:58] "GET /js/admin_exams.js HTTP/1.1" 200 -
+127.0.0.1 - - [08/Aug/2026 08:30:00] "GET /login.html HTTP/1.1" 200 -
+127.0.0.1 - - [08/Aug/2026 08:30:00] "GET /js/supabase.js HTTP/1.1" 200 -
+127.0.0.1 - - [08/Aug/2026 08:30:00] "GET /js/login.js HTTP/1.1" 200 -
+127.0.0.1 - - [08/Aug/2026 08:30:02] "GET /admin_exams.html HTTP/1.1" 200 -
+127.0.0.1 - - [08/Aug/2026 08:30:02] "GET /js/admin_exams.js HTTP/1.1" 200 -
