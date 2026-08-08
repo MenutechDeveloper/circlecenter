@@ -46,15 +46,86 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, "&#039;");
   }
 
+  function beautifyCode(code) {
+    if (!code) return "";
+    let lines = code.split('\n');
+    let indentLevel = 0;
+    const indentString = "  "; // 2 spaces
+    let formattedLines = [];
+
+    // Self-closing tags list
+    const selfClosingTags = ['img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'data', 'col', 'embed', 'param', 'track', 'wbr'];
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      if (!line) continue;
+
+      // 1. Calculate indent adjustments based on closing elements at the start of the line
+      // Check if line starts with a closing tag or closing curly/square brace
+      const startsWithCloseTag = line.match(/^<\/([a-zA-Z0-9:-]+)>/i);
+      const startsWithCloseBrace = line.startsWith('}') || line.startsWith(']');
+
+      if (startsWithCloseTag) {
+        const tagName = startsWithCloseTag[1].toLowerCase();
+        if (!selfClosingTags.includes(tagName)) {
+          indentLevel = Math.max(0, indentLevel - 1);
+        }
+      } else if (startsWithCloseBrace) {
+        indentLevel = Math.max(0, indentLevel - 1);
+      }
+
+      // Add current line with proper indentation
+      formattedLines.push(indentString.repeat(indentLevel) + line);
+
+      // 2. Adjust indentation level for the NEXT lines
+      // Count opening vs closing tags in this line
+      const openTags = [...line.matchAll(/<([a-zA-Z0-9:-]+)(?![^>]*\/>)/g)].map(m => m[1].toLowerCase());
+      const closeTags = [...line.matchAll(/<\/([a-zA-Z0-9:-]+)>/g)].map(m => m[1].toLowerCase());
+
+      let netIndent = 0;
+      openTags.forEach(tag => {
+        if (!selfClosingTags.includes(tag)) {
+          netIndent++;
+        }
+      });
+      closeTags.forEach(tag => {
+        if (!selfClosingTags.includes(tag)) {
+          netIndent--;
+        }
+      });
+
+      // Count curly and square braces
+      const openBraces = (line.match(/{/g) || []).length;
+      const closeBraces = (line.match(/}/g) || []).length;
+      const openBrackets = (line.match(/\[/g) || []).length;
+      const closeBrackets = (line.match(/\]/g) || []).length;
+
+      netIndent += (openBraces - closeBraces);
+      netIndent += (openBraces - closeBraces) ? 0 : 0; // dummy
+      netIndent += (openBrackets - closeBrackets);
+
+      if (startsWithCloseTag && !selfClosingTags.includes(startsWithCloseTag[1].toLowerCase())) {
+        indentLevel = Math.max(0, indentLevel + netIndent + 1);
+      } else if (startsWithCloseBrace) {
+        indentLevel = Math.max(0, indentLevel + netIndent + 1);
+      } else {
+        indentLevel = Math.max(0, indentLevel + netIndent);
+      }
+    }
+
+    return formattedLines.join('\n');
+  }
+
   function highlightCode(code) {
     if (!code) return "";
-    let escaped = escapeHTML(code);
+    let beautified = beautifyCode(code);
+    let escaped = escapeHTML(beautified);
     // 1. Strings: green
     escaped = escaped.replace(/(&quot;.*?&quot;|&#039;.*?&#039;|`.*?`)/g, '<span class="text-emerald-400">$1</span>');
     // 2. Comments: gray/slate
     escaped = escaped.replace(/(\/\/.*|#.*|&lt;!--[\s\S]*?--&gt;)/g, '<span class="text-slate-500">$1</span>');
     // 3. Keywords / tags: pink/amber/purple
-    const keywords = /\b(const|let|var|function|return|if|else|for|while|import|from|class|select|from|where|order|by|insert|into|values|delete|update|set|and|or|true|false)\b/gi;
+    const keywords = /\b(const|let|var|function|return|if|else|for|while|import|from|class|select|from|where|order|by|insert|into|values|delete|update|set|and|or|true|false)\b(?![^<]*>)/gi;
     escaped = escaped.replace(keywords, '<span class="text-pink-400 font-bold">$1</span>');
     // 4. HTML tags inside:
     escaped = escaped.replace(/(&lt;\/?\w+.*?&gt;)/g, '<span class="text-amber-300 font-bold">$1</span>');
@@ -984,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           let questionConsoleHtml = "";
           if (q.questionCode && q.questionCode.trim()) {
             questionConsoleHtml = `
-              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-300 max-h-80 overflow-y-auto mb-3 whitespace-pre-wrap relative shadow-inner">
+              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-300 max-h-80 overflow-y-auto whitespace-pre-wrap relative shadow-inner no-scrollbar">
                 <div class="flex items-center border-b border-slate-800 pb-1.5 mb-2 select-none">
                   <span class="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Consola</span>
                 </div>
@@ -995,19 +1066,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           if (respType === 'multiple') {
             widget = `
-              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col text-white relative mb-4" data-q-id="${q.id}">
                 ${questionConsoleHtml}
+              </div>
 
-                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
-                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Selecciona la opción correcta:</span>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                    ${(q.options || []).map(opt => `
-                      <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-900 cursor-pointer transition text-xs font-semibold text-slate-300">
-                        <input type="radio" name="sim_tech_q_${q.id}" value="${opt}" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500 bg-slate-950 border-slate-800" data-q-id="${q.id}">
-                        <span>${escapeHTML(opt)}</span>
-                      </label>
-                    `).join('')}
-                  </div>
+              <div class="bg-white p-3 rounded-xl border border-blue-100/50 space-y-2 text-black">
+                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Selecciona la opción correcta:</span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                  ${(q.options || []).map(opt => `
+                    <label class="flex items-center gap-2.5 p-3 rounded-xl border border-blue-50 bg-white hover:bg-blue-50/50 cursor-pointer transition text-xs font-semibold text-gray-700 shadow-sm">
+                      <input type="radio" name="sim_tech_q_${q.id}" value="${opt}" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500 bg-white border-blue-200" data-q-id="${q.id}">
+                      <span>${escapeHTML(opt)}</span>
+                    </label>
+                  `).join('')}
                 </div>
               </div>
             `;
@@ -1235,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         partHtml += `
           <div class="space-y-1 bg-white p-5 rounded-2xl border border-blue-50 shadow-sm text-black">
-            <span class="text-xs font-bold text-gray-700 block mb-1">Pregunta: ${escapeHTML(q.text)}</span>
+            <span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed">Pregunta: ${escapeHTML(q.text)}</span>
             ${widget}
           </div>
         `;
