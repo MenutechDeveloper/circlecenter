@@ -36,6 +36,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   let partsData = []; // [{ id, title, questions: [] }]
   let lastActivePartIdx = 0; // Índice de la sección activa para añadir modos especiales
 
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   // Alerta
   function showAlert(msg, isError = false) {
     showPastelAlert(msg, isError ? "Error" : "Éxito");
@@ -460,14 +470,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="mt-2">
             <label class="text-[10px] text-blue-600 block font-bold">Opción Correcta</label>
             <select
-              class="q-correct-select px-2 py-1 border border-blue-200 focus:outline-none rounded-lg text-xs bg-white w-full max-w-xs mt-0.5"
+              class="q-correct-select px-2 py-1 border border-blue-200 focus:outline-none rounded-lg text-xs bg-white w-full max-w-xs mt-0.5 text-black"
               data-part-idx="${partIdx}"
               data-q-idx="${qIdx}"
             >
-              <option value="">Selecciona la correcta...</option>
+              <option value="" class="text-black">Selecciona la correcta...</option>
               ${[0, 1, 2, 3].map(optIdx => `
-                <option value="${q.options[optIdx] || ''}" ${q.correct === q.options[optIdx] && q.correct ? 'selected' : ''}>
-                  ${q.options[optIdx] || `Opción ${optIdx + 1}`}
+                <option value="${escapeHTML(q.options[optIdx] || '')}" ${q.correct === q.options[optIdx] && q.correct ? 'selected' : ''} class="text-black">
+                  ${escapeHTML(q.options[optIdx]) || `Opción ${optIdx + 1}`}
                 </option>
               `).join('')}
             </select>
@@ -550,16 +560,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div>
                   <label class="text-[9px] text-indigo-600 block font-bold">Opción Correcta</label>
                   <select
-                    class="q-prog-correct-select px-2 py-1 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-white w-full mt-0.5"
+                    class="q-prog-correct-select px-2 py-1 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-white w-full mt-0.5 text-black"
                     data-part-idx="${partIdx}"
                     data-q-idx="${qIdx}"
                   >
-                    <option value="">Selecciona la correcta...</option>
+                    <option value="" class="text-black">Selecciona la correcta...</option>
                     ${[0, 1, 2, 3].map(optIdx => {
                       const optVal = (q.options && q.options[optIdx]) || '';
                       return `
-                        <option value="${optVal}" ${q.correct === optVal && q.correct ? 'selected' : ''}>
-                          ${optVal || `Opción ${optIdx + 1}`}
+                        <option value="${escapeHTML(optVal)}" ${q.correct === optVal && q.correct ? 'selected' : ''} class="text-black">
+                          ${escapeHTML(optVal) || `Opción ${optIdx + 1}`}
                         </option>
                       `;
                     }).join('')}
@@ -684,11 +694,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const correctSelect = document.querySelector(`.q-prog-correct-select[data-part-idx="${partIdx}"][data-q-idx="${qIdx}"]`);
         if (correctSelect) {
           const currentVal = correctSelect.value;
-          correctSelect.innerHTML = '<option value="">Selecciona la correcta...</option>';
+          correctSelect.innerHTML = '<option value="" class="text-black">Selecciona la correcta...</option>';
           partsData[partIdx].questions[qIdx].options.forEach((opt, idx) => {
-            const optLabel = opt || `Opción ${idx + 1}`;
+            const optLabel = opt ? escapeHTML(opt) : `Opción ${idx + 1}`;
             const selectedStr = currentVal === opt && opt ? 'selected' : '';
-            correctSelect.innerHTML += `<option value="${opt}" ${selectedStr}>${optLabel}</option>`;
+            correctSelect.innerHTML += `<option value="${escapeHTML(opt)}" ${selectedStr} class="text-black">${optLabel}</option>`;
           });
         }
       });
@@ -713,11 +723,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const correctSelect = document.querySelector(`.q-correct-select[data-part-idx="${partIdx}"][data-q-idx="${qIdx}"]`);
         if (correctSelect) {
           const currentVal = correctSelect.value;
-          correctSelect.innerHTML = '<option value="">Selecciona la correcta...</option>';
+          correctSelect.innerHTML = '<option value="" class="text-black">Selecciona la correcta...</option>';
           partsData[partIdx].questions[qIdx].options.forEach((opt, idx) => {
-            const optLabel = opt || `Opción ${idx + 1}`;
+            const optLabel = opt ? escapeHTML(opt) : `Opción ${idx + 1}`;
             const selectedStr = currentVal === opt && opt ? 'selected' : '';
-            correctSelect.innerHTML += `<option value="${opt}" ${selectedStr}>${optLabel}</option>`;
+            correctSelect.innerHTML += `<option value="${escapeHTML(opt)}" ${selectedStr} class="text-black">${optLabel}</option>`;
           });
         }
       });
@@ -843,6 +853,1349 @@ document.addEventListener('DOMContentLoaded', async () => {
       showAlert("Error al guardar examen: " + err.message, true);
     }
   });
+
+  // ==========================================
+  // SINOPSIS Y MODO SIMULACIÓN DE EXAMEN (TEST)
+  // ==========================================
+  const testExamModal = document.getElementById('test-exam-modal');
+  const btnTestExam = document.getElementById('btn-test-exam');
+  const btnCloseTest = document.getElementById('btn-close-test');
+  const simTechExamTitle = document.getElementById('sim-tech-exam-title');
+  const simTechExamDesc = document.getElementById('sim-tech-exam-desc');
+  const simTechProgressText = document.getElementById('sim-tech-progress-text');
+  const simTechQuestionsContainer = document.getElementById('sim-tech-questions-container');
+  const btnSimSubmit = document.getElementById('btn-sim-submit');
+  const simTechSection = document.getElementById('sim-tech-section');
+  const simCompletedSection = document.getElementById('sim-completed-section');
+  const simResultsReport = document.getElementById('sim-results-report');
+  const btnSimRestart = document.getElementById('btn-sim-restart');
+
+  let simAnswers = {}; // { [qId]: answerValue }
+  let simActiveIntervals = []; // Store any active canvas timers
+
+  if (btnTestExam && testExamModal) {
+    btnTestExam.addEventListener('click', () => {
+      // Validar si hay secciones y preguntas para simular
+      if (partsData.length === 0 || partsData.every(p => p.questions.length === 0)) {
+        showPastelAlert("Por favor, agrega al menos una sección con preguntas para poder iniciar la simulación de prueba.", "Aviso");
+        return;
+      }
+
+      // Reiniciar estado
+      simAnswers = {};
+      clearSimActiveIntervals();
+
+      // Mostrar modal
+      testExamModal.classList.remove('hidden');
+      simTechSection.classList.remove('hidden');
+      simCompletedSection.classList.add('hidden');
+
+      // Configurar título y descripción
+      const examName = examNameInput.value.trim() || "Examen Técnico de Prueba";
+      const examDesc = examDescInput.value.trim() || "Simulación del examen actualmente en desarrollo.";
+      simTechExamTitle.innerHTML = `Examen: <span class="text-blue-600 font-extrabold">${escapeHTML(examName)}</span>`;
+      simTechExamDesc.textContent = examDesc;
+
+      renderSimulatedExam();
+    });
+  }
+
+  if (btnCloseTest && testExamModal) {
+    btnCloseTest.addEventListener('click', () => {
+      testExamModal.classList.add('hidden');
+      clearSimActiveIntervals();
+    });
+  }
+
+  function clearSimActiveIntervals() {
+    simActiveIntervals.forEach(clearInterval);
+    simActiveIntervals = [];
+  }
+
+  function updateSimProgress(answered, total) {
+    if (simTechProgressText) {
+      simTechProgressText.textContent = `${answered} / ${total} Respondidas`;
+    }
+  }
+
+  function renderSimulatedExam() {
+    simTechQuestionsContainer.innerHTML = "";
+    let qCount = 0;
+
+    partsData.forEach((part, partIdx) => {
+      let partHtml = `
+        <div class="bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100/50 shadow-sm space-y-4">
+          <h3 class="text-sm font-bold text-indigo-700 flex items-center gap-1.5 border-b border-indigo-100 pb-2">
+            ${escapeHTML(part.title)}
+          </h3>
+          <div class="space-y-4">
+      `;
+
+      part.questions.forEach((q, qIdx) => {
+        qCount++;
+        let widget = "";
+
+        if (q.type === 'multiple') {
+          widget = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+              ${q.options.map(opt => `
+                <label class="flex items-center gap-2 p-2.5 rounded-xl border border-blue-50 bg-white hover:bg-blue-50/50 cursor-pointer transition text-xs font-semibold text-gray-700">
+                  <input type="radio" name="sim_tech_q_${q.id}" value="${opt}" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500" data-q-id="${q.id}">
+                  <span>${escapeHTML(opt)}</span>
+                </label>
+              `).join('')}
+            </div>
+          `;
+        } else if (q.type === 'boolean') {
+          widget = `
+            <div class="grid grid-cols-2 gap-3 mt-2 max-w-xs">
+              <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-indigo-50 bg-white hover:bg-indigo-50/50 cursor-pointer transition text-xs font-bold text-gray-700">
+                <input type="radio" name="sim_tech_q_${q.id}" value="Verdadero" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500" data-q-id="${q.id}">
+                Verdadero
+              </label>
+              <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-indigo-50 bg-white hover:bg-indigo-50/50 cursor-pointer transition text-xs font-bold text-gray-700">
+                <input type="radio" name="sim_tech_q_${q.id}" value="Falso" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500" data-q-id="${q.id}">
+                Falso
+              </label>
+            </div>
+          `;
+        } else if (q.type === 'short') {
+          widget = `
+            <textarea rows="3" class="sim-tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none text-black" data-q-id="${q.id}"></textarea>
+          `;
+        } else if (q.type === 'programacion') {
+          const respType = q.responseType || 'ide';
+
+          let questionConsoleHtml = "";
+          if (q.questionCode && q.questionCode.trim()) {
+            questionConsoleHtml = `
+              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-300 max-h-80 overflow-y-auto mb-3 whitespace-pre-wrap relative shadow-inner">
+                <div class="flex items-center border-b border-slate-800 pb-1.5 mb-2 select-none">
+                  <span class="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Consola</span>
+                </div>
+                <code>${highlightCode(q.questionCode)}</code>
+              </div>
+            `;
+          }
+
+          if (respType === 'multiple') {
+            widget = `
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+                ${questionConsoleHtml}
+
+                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Selecciona la opción correcta:</span>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                    ${(q.options || []).map(opt => `
+                      <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-900 cursor-pointer transition text-xs font-semibold text-slate-300">
+                        <input type="radio" name="sim_tech_q_${q.id}" value="${opt}" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500 bg-slate-950 border-slate-800" data-q-id="${q.id}">
+                        <span>${escapeHTML(opt)}</span>
+                      </label>
+                    `).join('')}
+                  </div>
+                </div>
+              </div>
+            `;
+          } else if (respType === 'short') {
+            widget = `
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+                ${questionConsoleHtml}
+
+                <div class="space-y-1">
+                  <label class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Escribe tu respuesta:</label>
+                  <textarea rows="3" class="sim-tech-textarea-input w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-indigo-500 focus:outline-none custom-scroll" data-q-id="${q.id}" placeholder="Escribe tu código o respuesta aquí..."></textarea>
+                </div>
+              </div>
+            `;
+          } else {
+            widget = `
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+                ${questionConsoleHtml}
+
+                <!-- Tab selector -->
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                  <div class="flex gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
+                    ${['html', 'css', 'js', 'sql'].map(tab => {
+                      const isActive = tab === 'html';
+                      const uppercaseTab = tab.toUpperCase();
+                      return `
+                        <button type="button" class="sim-tab-btn-${q.id} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 ${isActive ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}" data-tab="${tab}" data-q-id="${q.id}">
+                          ${uppercaseTab}
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                  <div class="text-[9px] text-slate-400 font-bold uppercase tracking-wider bg-slate-950/60 px-2.5 py-1 rounded border border-slate-800">
+                    Modo Programación
+                  </div>
+                </div>
+
+                <!-- Editors and Preview Workspace Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                  <!-- Code Editors Column -->
+                  <div class="space-y-3">
+                    <!-- HTML Editor -->
+                    <div class="sim-editor-pane-${q.id}" id="sim-pane-html-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Código HTML5</span>
+                        <span class="text-orange-400">index.html</span>
+                      </div>
+                      <textarea id="sim-code-html-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="<!-- Escribe tu HTML aquí -->"></textarea>
+                    </div>
+
+                    <!-- CSS Editor -->
+                    <div class="sim-editor-pane-${q.id} hidden" id="sim-pane-css-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Código CSS3</span>
+                        <span class="text-blue-400">styles.css</span>
+                      </div>
+                      <textarea id="sim-code-css-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="/* Escribe tu CSS aquí */"></textarea>
+                    </div>
+
+                    <!-- JS Editor -->
+                    <div class="sim-editor-pane-${q.id} hidden" id="sim-pane-js-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Código JavaScript</span>
+                        <span class="text-yellow-400">app.js</span>
+                      </div>
+                      <textarea id="sim-code-js-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="// Escribe tu JS aquí (usa console.log para ver resultados)"></textarea>
+                    </div>
+
+                    <!-- SQL Editor -->
+                    <div class="sim-editor-pane-${q.id} hidden" id="sim-pane-sql-${q.id}">
+                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
+                        <span>Consulta SQL (Tablas: users, vacancies)</span>
+                        <span class="text-cyan-400">query.sql</span>
+                      </div>
+                      <textarea id="sim-code-sql-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="SELECT * FROM users; -- Prueba aquí tus consultas SQL"></textarea>
+                    </div>
+
+                    <!-- Compile Button -->
+                    <button type="button" id="sim-btn-compile-${q.id}" class="sim-btn-compile-class w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 transition duration-200" data-q-id="${q.id}">
+                      Compilar y Guardar Código
+                    </button>
+                  </div>
+
+                  <!-- Live Preview / Terminal Column -->
+                  <div class="space-y-3 flex flex-col justify-between">
+                    <!-- Output Console -->
+                    <div class="flex-1 flex flex-col min-h-0">
+                      <span class="text-[10px] text-slate-400 font-semibold mb-1 block">Consola de Ejecución</span>
+                      <div class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-emerald-400 overflow-y-auto max-h-48 custom-scroll relative shadow-inner flex flex-col justify-between" style="min-height: 120px;">
+                        <pre id="sim-output-console-${q.id}" class="whitespace-pre-wrap font-mono">Sube/Compila tu código para ver el resultado aquí...</pre>
+                        <div class="flex justify-between items-center text-[8px] text-slate-500 mt-2 pt-1 border-t border-slate-900 select-none">
+                          <span>Compilador V1.0.0</span>
+                          <span>Listo</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Live Web Preview Box (Only relevant for HTML/CSS/JS) -->
+                    <div class="h-28 flex flex-col min-h-0" id="sim-preview-box-container-${q.id}">
+                      <span class="text-[10px] text-slate-400 font-semibold mb-1 block">Vista Previa Web</span>
+                      <div class="flex-1 bg-white rounded-xl overflow-hidden border border-slate-800 relative">
+                        <iframe id="sim-preview-frame-${q.id}" class="w-full h-full bg-white block" sandbox="allow-scripts"></iframe>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            `;
+          }
+        } else if (q.type === 'canvas') {
+          widget = `
+            <div class="illustrator-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 text-white relative select-none overflow-hidden" data-q-id="${q.id}">
+
+              <!-- Header Bar (Timer and Info) -->
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                  <span class="text-xs font-bold text-rose-400 uppercase tracking-widest animate-pulse" id="sim-canvas-timer-${q.id}">Tiempo Restante: 30:00</span>
+                </div>
+                <div class="text-[10px] text-slate-400 flex items-center gap-2">
+                  <span class="bg-purple-950/80 px-2 py-0.5 rounded text-purple-300 font-extrabold uppercase text-[9px] border border-purple-800">Lienzo A4 (Illustrator Mode)</span>
+                  <span class="hidden md:inline">Atajos: <strong class="text-purple-300">Ctrl+Z</strong> (Deshacer) &bull; <strong class="text-purple-300">Ctrl+C/V</strong> (Duplicar) &bull; <strong class="text-purple-300">Espacio+Arrastrar</strong></span>
+                </div>
+              </div>
+
+              <!-- Main Workspace Grid -->
+              <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 relative">
+
+                <!-- Left Toolbar -->
+                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                  <!-- Tool selectors -->
+                  <div class="space-y-3">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Herramientas</span>
+                    <div class="grid grid-cols-2 gap-2">
+                      <button type="button" id="sim-tool-select-${q.id}" class="sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 active bg-purple-600 text-white" data-tool="select" data-q-id="${q.id}">
+                        <i class="fa-solid fa-arrow-pointer"></i>
+                        <span class="text-[9px]">Puntero</span>
+                      </button>
+                      <button type="button" id="sim-tool-draw-${q.id}" class="sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 bg-slate-900 text-slate-400 hover:bg-slate-800" data-tool="draw" data-q-id="${q.id}">
+                        <i class="fa-solid fa-pencil"></i>
+                        <span class="text-[9px]">Lápiz</span>
+                      </button>
+                      <button type="button" id="sim-tool-rect-${q.id}" class="sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 bg-slate-900 text-slate-400 hover:bg-slate-800" data-tool="rect" data-q-id="${q.id}">
+                        <i class="fa-regular fa-square"></i>
+                        <span class="text-[9px]">Rectángulo</span>
+                      </button>
+                      <button type="button" id="sim-tool-circle-${q.id}" class="sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 bg-slate-900 text-slate-400 hover:bg-slate-800" data-tool="circle" data-q-id="${q.id}">
+                        <i class="fa-regular fa-circle"></i>
+                        <span class="text-[9px]">Círculo</span>
+                      </button>
+                    </div>
+
+                    <!-- Line Width -->
+                    <div class="space-y-1">
+                      <label class="text-[9px] text-slate-400 font-bold block uppercase">Grosor de Trazo</label>
+                      <input type="range" id="sim-brush-size-${q.id}" min="1" max="40" value="5" class="w-full accent-purple-500">
+                    </div>
+
+                    <!-- Add Text tool -->
+                    <div class="space-y-1 pt-1 border-t border-slate-800/60">
+                      <label class="text-[9px] text-slate-400 font-bold block uppercase">Añadir Texto al Lienzo</label>
+                      <div class="flex gap-1.5">
+                        <input type="text" id="sim-text-input-${q.id}" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none" placeholder="Escribe aquí..." value="Hola Mundo">
+                        <button type="button" id="sim-btn-add-text-${q.id}" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs font-bold" data-q-id="${q.id}"><i class="fa-solid fa-plus"></i></button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Actions / Clear -->
+                  <div class="space-y-2 pt-2 border-t border-slate-800/60">
+                    <button type="button" id="sim-btn-undo-${q.id}" class="w-full py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-[10px] font-bold text-slate-300 transition flex items-center justify-center gap-1.5" data-q-id="${q.id}">
+                      <i class="fa-solid fa-rotate-left"></i> Deshacer (Ctrl+Z)
+                    </button>
+                    <button type="button" id="sim-btn-clear-${q.id}" class="w-full py-1.5 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-900/40 text-rose-300 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1.5" data-q-id="${q.id}">
+                      <i class="fa-regular fa-trash-can"></i> Limpiar Lienzo
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Center Canvas Area (A4 Sheet layout) -->
+                <div class="lg:col-span-2 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden relative" style="height: 480px;" id="sim-canvas-container-${q.id}">
+                  <!-- Scaled A4 workspace board -->
+                  <div id="sim-a4-board-${q.id}" class="bg-white relative shadow-2xl origin-center" style="width: 310px; height: 438px; transform: scale(1); min-width: 310px; min-height: 438px;">
+                    <canvas id="sim-canvas-element-${q.id}" width="310" height="438" class="absolute inset-0 z-10 block cursor-crosshair"></canvas>
+                  </div>
+
+                  <!-- Floating zoom indicator -->
+                  <div class="absolute bottom-3 right-3 bg-slate-900/90 border border-slate-800 text-[10px] px-2 py-1 rounded-lg text-slate-300 pointer-events-none font-bold z-20">
+                    Zoom: <span id="sim-zoom-label-${q.id}">100%</span>
+                  </div>
+                </div>
+
+                <!-- Right Assets & Color Panel -->
+                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex flex-col space-y-4">
+
+                  <!-- Color Palette -->
+                  <div class="space-y-2">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Paleta de Colores</span>
+                    <div class="grid grid-cols-6 gap-1.5" id="sim-color-palette-${q.id}">
+                      <!-- Populated dynamically -->
+                    </div>
+                    <div class="flex items-center justify-between pt-1.5 border-t border-slate-800/60">
+                      <span class="text-[9px] text-slate-400 font-bold uppercase">Personalizado</span>
+                      <input type="color" id="sim-color-picker-${q.id}" value="#a855f7" class="w-6 h-6 rounded-lg bg-transparent border-none cursor-pointer">
+                    </div>
+                  </div>
+
+                  <!-- Assets Drawer -->
+                  <div class="flex-1 flex flex-col min-h-0 space-y-1.5">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block shrink-0">Biblioteca de Assets (Ilustraciones)</span>
+                    <div class="flex-1 overflow-y-auto custom-scroll pr-1 space-y-1.5" id="sim-assets-drawer-${q.id}">
+                      <!-- Populated with click-to-add items -->
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+          `;
+        }
+
+        partHtml += `
+          <div class="space-y-1 bg-white p-5 rounded-2xl border border-blue-50 shadow-sm text-black">
+            <span class="text-xs font-bold text-gray-700 block mb-1">Pregunta: ${escapeHTML(q.text)}</span>
+            ${widget}
+          </div>
+        `;
+      });
+
+      partHtml += `
+          </div>
+        </div>
+      `;
+      simTechQuestionsContainer.innerHTML += partHtml;
+    });
+
+    updateSimProgress(0, qCount);
+
+    // Binds
+    document.querySelectorAll('.sim-tech-radio-input').forEach(radio => {
+      radio.addEventListener('change', () => {
+        simAnswers[radio.getAttribute('data-q-id')] = radio.value;
+        const total = Object.keys(simAnswers).length;
+        updateSimProgress(total, qCount);
+      });
+    });
+
+    document.querySelectorAll('.sim-tech-textarea-input').forEach(ta => {
+      ta.addEventListener('input', () => {
+        const qId = ta.getAttribute('data-q-id');
+        const val = ta.value.trim();
+        if (val) {
+          simAnswers[qId] = val;
+        } else {
+          delete simAnswers[qId];
+        }
+        const total = Object.keys(simAnswers).length;
+        updateSimProgress(total, qCount);
+      });
+    });
+
+    // Initialize Interactive Canvas and Programming environments
+    partsData.forEach(part => {
+      part.questions.forEach(q => {
+        if (q.type === 'canvas') {
+          initSimIllustratorCanvas(q.id);
+        } else if (q.type === 'programacion') {
+          initSimProgramacionIDE(q.id, q);
+        }
+      });
+    });
+  }
+
+  function initSimIllustratorCanvas(qId) {
+    const canvas = document.getElementById(`sim-canvas-element-${qId}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById(`sim-canvas-container-${qId}`);
+    const board = document.getElementById(`sim-a4-board-${qId}`);
+    const zoomLabel = document.getElementById(`sim-zoom-label-${qId}`);
+    const brushSizeInput = document.getElementById(`sim-brush-size-${qId}`);
+    const colorPicker = document.getElementById(`sim-color-picker-${qId}`);
+    const textInput = document.getElementById(`sim-text-input-${qId}`);
+    const addTextBtn = document.getElementById(`sim-btn-add-text-${qId}`);
+    const undoBtn = document.getElementById(`sim-btn-undo-${qId}`);
+    const clearBtn = document.getElementById(`sim-btn-clear-${qId}`);
+    const timerLabel = document.getElementById(`sim-canvas-timer-${qId}`);
+
+    let layers = [];
+    let undoHistory = [];
+    let currentTool = 'select'; // select, draw, rect, circle
+    let brushSize = 5;
+    let strokeColor = '#a855f7';
+    let selectedObject = null;
+    let isDrawing = false;
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let currentStrokePoints = [];
+    let zoomScale = 1.0;
+
+    // Configurar temporizador (30 Minutos)
+    let timeRemainingSeconds = 30 * 60;
+    const timerInterval = setInterval(() => {
+      if (document.getElementById(`sim-canvas-timer-${qId}`) === null) {
+        clearInterval(timerInterval);
+        return;
+      }
+      if (timeRemainingSeconds <= 0) {
+        clearInterval(timerInterval);
+        saveCanvasToAnswers();
+        return;
+      }
+      timeRemainingSeconds--;
+      const min = String(Math.floor(timeRemainingSeconds / 60)).padStart(2, '0');
+      const sec = String(timeRemainingSeconds % 60).padStart(2, '0');
+      timerLabel.textContent = `Tiempo Restante: ${min}:${sec}`;
+    }, 1000);
+    simActiveIntervals.push(timerInterval);
+
+    // Paleta de Colores
+    const colors = [
+      '#000000', '#ffffff', '#ef4444', '#f97316', '#f59e0b', '#10b981',
+      '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e'
+    ];
+    const paletteContainer = document.getElementById(`sim-color-palette-${qId}`);
+    if (paletteContainer) {
+      paletteContainer.innerHTML = '';
+      colors.forEach(color => {
+        const borderStyle = color === '#ffffff' ? 'border-gray-300' : 'border-transparent';
+        paletteContainer.innerHTML += `
+          <button type="button" class="w-5 h-5 rounded-full border ${borderStyle} transition transform hover:scale-115 active:scale-95" style="background-color: ${color};" data-color="${color}"></button>
+        `;
+      });
+      paletteContainer.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          strokeColor = btn.getAttribute('data-color');
+          if (colorPicker) colorPicker.value = strokeColor;
+          updateSelectedObjectStyle();
+        });
+      });
+    }
+
+    if (colorPicker) {
+      colorPicker.addEventListener('input', (e) => {
+        strokeColor = e.target.value;
+        updateSelectedObjectStyle();
+      });
+    }
+
+    if (brushSizeInput) {
+      brushSizeInput.addEventListener('input', (e) => {
+        brushSize = parseInt(e.target.value);
+        updateSelectedObjectStyle();
+      });
+    }
+
+    function updateSelectedObjectStyle() {
+      if (selectedObject && currentTool === 'select') {
+        if (selectedObject.type === 'rect' || selectedObject.type === 'circle' || selectedObject.type === 'text') {
+          selectedObject.color = strokeColor;
+        }
+        if (selectedObject.type === 'rect' || selectedObject.type === 'circle') {
+          selectedObject.width = brushSize;
+        }
+        drawWorkspace();
+        saveCanvasToAnswers();
+      }
+    }
+
+    // Biblioteca de Assets
+    const assets = [
+      { name: "👑 Corona Real", value: "👑" },
+      { name: "⚡ Rayo", value: "⚡" },
+      { name: "⭐ Estrella Dorada", value: "⭐" },
+      { name: "💡 Idea Genial", value: "💡" },
+      { name: "🔥 Fuego Intenso", value: "🔥" },
+      { name: "🛡️ Escudo de Éxito", value: "🛡️" },
+      { name: "📢 Megáfono Oferta", value: "📢" },
+      { name: "🎯 Tiro al Blanco", value: "🎯" },
+      { name: "🚀 Cohete Alza", value: "🚀" },
+      { name: "🍀 Trébol Suerte", value: "🍀" }
+    ];
+    const assetsContainer = document.getElementById(`sim-assets-drawer-${qId}`);
+    if (assetsContainer) {
+      assetsContainer.innerHTML = '';
+      assets.forEach((asset, idx) => {
+        assetsContainer.innerHTML += `
+          <button type="button" class="w-full text-left p-1.5 bg-slate-900 hover:bg-purple-900/40 rounded-xl transition text-[11px] font-bold text-slate-300 flex items-center gap-2 border border-slate-800 hover:border-purple-800" data-asset-idx="${idx}">
+            <span class="text-base">${asset.value}</span>
+            <span>${asset.name}</span>
+          </button>
+        `;
+      });
+      assetsContainer.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-asset-idx'));
+          addAssetToCanvas(assets[idx]);
+        });
+      });
+    }
+
+    function addAssetToCanvas(asset) {
+      const newObj = {
+        id: "layer_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+        type: 'text',
+        text: asset.value,
+        fontSize: 50,
+        x: 130,
+        y: 200,
+        color: '#000000'
+      };
+      saveStateToUndo();
+      layers.push(newObj);
+      selectedObject = newObj;
+      currentTool = 'select';
+      updateToolUI();
+      drawWorkspace();
+      saveCanvasToAnswers();
+    }
+
+    // Cambiar Herramientas
+    document.querySelectorAll(`.sim-canvas-tool-btn[data-q-id="${qId}"]`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll(`.sim-canvas-tool-btn[data-q-id="${qId}"]`).forEach(b => {
+          b.className = "sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 bg-slate-900 text-slate-400 hover:bg-slate-800";
+        });
+        btn.className = "sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 active bg-purple-600 text-white";
+        currentTool = btn.getAttribute('data-tool');
+        if (currentTool !== 'select') {
+          selectedObject = null;
+        }
+        drawWorkspace();
+      });
+    });
+
+    function updateToolUI() {
+      document.querySelectorAll(`.sim-canvas-tool-btn[data-q-id="${qId}"]`).forEach(b => {
+        const t = b.getAttribute('data-tool');
+        if (t === currentTool) {
+          b.className = "sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 active bg-purple-600 text-white";
+        } else {
+          b.className = "sim-canvas-tool-btn p-2 rounded-xl transition text-xs font-bold flex flex-col items-center gap-1 bg-slate-900 text-slate-400 hover:bg-slate-800";
+        }
+      });
+    }
+
+    // Añadir texto
+    if (addTextBtn) {
+      addTextBtn.addEventListener('click', () => {
+        const val = textInput.value.trim();
+        if (!val) return;
+        saveStateToUndo();
+        const newObj = {
+          id: "layer_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+          type: 'text',
+          text: val,
+          fontSize: 24,
+          x: 50,
+          y: 200,
+          color: strokeColor
+        };
+        layers.push(newObj);
+        selectedObject = newObj;
+        currentTool = 'select';
+        updateToolUI();
+        drawWorkspace();
+        saveCanvasToAnswers();
+      });
+    }
+
+    // Deshacer / Limpiar
+    if (undoBtn) {
+      undoBtn.addEventListener('click', () => {
+        if (undoHistory.length > 0) {
+          layers = undoHistory.pop();
+          selectedObject = null;
+          drawWorkspace();
+          saveCanvasToAnswers();
+        } else {
+          showPastelAlert("No hay más acciones para deshacer.", "Lienzo");
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        saveStateToUndo();
+        layers = [];
+        selectedObject = null;
+        drawWorkspace();
+        saveCanvasToAnswers();
+      });
+    }
+
+    function saveStateToUndo() {
+      undoHistory.push(JSON.parse(JSON.stringify(layers)));
+      if (undoHistory.length > 15) {
+        undoHistory.shift();
+      }
+    }
+
+    function saveCanvasToAnswers() {
+      simAnswers[qId] = canvas.toDataURL('image/png');
+      const total = Object.keys(simAnswers).length;
+      const qCount = partsData.reduce((acc, p) => acc + p.questions.length, 0);
+      updateSimProgress(total, qCount);
+    }
+
+    // Zoom and Space drag keyboard support
+    let isSpacePressed = false;
+    const keydownHandler = (e) => {
+      if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+        isSpacePressed = true;
+        container.style.cursor = 'grab';
+        e.preventDefault();
+      }
+      if (e.ctrlKey && e.code === 'KeyZ') {
+        if (undoHistory.length > 0) {
+          layers = undoHistory.pop();
+          selectedObject = null;
+          drawWorkspace();
+          saveCanvasToAnswers();
+        }
+        e.preventDefault();
+      }
+      if ((e.code === 'Delete' || e.code === 'Backspace') && selectedObject && document.activeElement.tagName !== 'INPUT') {
+        saveStateToUndo();
+        layers = layers.filter(l => l.id !== selectedObject.id);
+        selectedObject = null;
+        drawWorkspace();
+        saveCanvasToAnswers();
+        e.preventDefault();
+      }
+    };
+
+    const keyupHandler = (e) => {
+      if (e.code === 'Space') {
+        isSpacePressed = false;
+        container.style.cursor = 'default';
+      }
+    };
+
+    window.addEventListener('keydown', keydownHandler);
+    window.addEventListener('keyup', keyupHandler);
+
+    // Remove keyboard listener when modal closes
+    btnCloseTest.addEventListener('click', () => {
+      window.removeEventListener('keydown', keydownHandler);
+      window.removeEventListener('keyup', keyupHandler);
+    }, { once: true });
+
+    container.addEventListener('wheel', (e) => {
+      if (isSpacePressed || e.ctrlKey) {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.1 : -0.1;
+        zoomScale = Math.min(Math.max(zoomScale + delta, 0.5), 2.5);
+        board.style.transform = `scale(${zoomScale})`;
+        zoomLabel.textContent = `${Math.round(zoomScale * 100)}%`;
+      }
+    }, { passive: false });
+
+    function drawWorkspace() {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1;
+      const gridSize = 20;
+      for (let x = 0; x < canvas.width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      layers.forEach(layer => {
+        if (layer.type === 'stroke') {
+          if (layer.points.length < 2) return;
+          ctx.beginPath();
+          ctx.strokeStyle = layer.color;
+          ctx.lineWidth = layer.width;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.moveTo(layer.points[0].x, layer.points[0].y);
+          for (let i = 1; i < layer.points.length; i++) {
+            ctx.lineTo(layer.points[i].x, layer.points[i].y);
+          }
+          ctx.stroke();
+        } else if (layer.type === 'rect') {
+          ctx.beginPath();
+          ctx.strokeStyle = layer.color;
+          ctx.lineWidth = layer.width;
+          ctx.strokeRect(layer.x, layer.y, layer.w, layer.h);
+        } else if (layer.type === 'circle') {
+          ctx.beginPath();
+          ctx.strokeStyle = layer.color;
+          ctx.lineWidth = layer.width;
+          ctx.arc(layer.x, layer.y, layer.r, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (layer.type === 'text') {
+          ctx.fillStyle = layer.color;
+          ctx.font = `bold ${layer.fontSize}px 'Quicksand', sans-serif`;
+          ctx.textBaseline = 'top';
+          ctx.fillText(layer.text, layer.x, layer.y);
+        }
+      });
+
+      if (currentTool === 'select' && selectedObject) {
+        ctx.save();
+        ctx.strokeStyle = '#a855f7';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+
+        let bx = 0, by = 0, bw = 0, bh = 0;
+        if (selectedObject.type === 'stroke') {
+          const xs = selectedObject.points.map(p => p.x);
+          const ys = selectedObject.points.map(p => p.y);
+          const minX = Math.min(...xs);
+          const maxX = Math.max(...xs);
+          const minY = Math.min(...ys);
+          const maxY = Math.max(...ys);
+          bx = minX - 4;
+          by = minY - 4;
+          bw = (maxX - minX) + 8;
+          bh = (maxY - minY) + 8;
+        } else if (selectedObject.type === 'rect') {
+          bx = selectedObject.x - 4;
+          by = selectedObject.y - 4;
+          bw = selectedObject.w + 8;
+          bh = selectedObject.h + 8;
+        } else if (selectedObject.type === 'circle') {
+          bx = selectedObject.x - selectedObject.r - 4;
+          by = selectedObject.y - selectedObject.r - 4;
+          bw = (selectedObject.r * 2) + 8;
+          bh = (selectedObject.r * 2) + 8;
+        } else if (selectedObject.type === 'text') {
+          ctx.font = `bold ${selectedObject.fontSize}px 'Quicksand', sans-serif`;
+          const textMetrics = ctx.measureText(selectedObject.text);
+          bx = selectedObject.x - 4;
+          by = selectedObject.y - 2;
+          bw = textMetrics.width + 8;
+          bh = selectedObject.fontSize + 4;
+        }
+
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = '#a855f7';
+        ctx.fillRect(bx - 3, by - 3, 6, 6);
+        ctx.fillRect(bx + bw - 3, by - 3, 6, 6);
+        ctx.fillRect(bx - 3, by + bh - 3, 6, 6);
+        ctx.fillRect(bx + bw - 3, by + bh - 3, 6, 6);
+        ctx.restore();
+      }
+    }
+
+    function getMouseCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * (canvas.width / rect.width),
+        y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      const coords = getMouseCoords(e);
+      startX = coords.x;
+      startY = coords.y;
+
+      if (currentTool === 'draw') {
+        isDrawing = true;
+        saveStateToUndo();
+        currentStrokePoints = [{ x: startX, y: startY }];
+        layers.push({
+          id: "layer_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+          type: 'stroke',
+          color: strokeColor,
+          width: brushSize,
+          points: currentStrokePoints
+        });
+      } else if (currentTool === 'rect') {
+        isDrawing = true;
+        saveStateToUndo();
+        layers.push({
+          id: "layer_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+          type: 'rect',
+          color: strokeColor,
+          width: brushSize,
+          x: startX,
+          y: startY,
+          w: 1,
+          h: 1
+        });
+      } else if (currentTool === 'circle') {
+        isDrawing = true;
+        saveStateToUndo();
+        layers.push({
+          id: "layer_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+          type: 'circle',
+          color: strokeColor,
+          width: brushSize,
+          x: startX,
+          y: startY,
+          r: 1
+        });
+      } else if (currentTool === 'select') {
+        let found = null;
+        for (let i = layers.length - 1; i >= 0; i--) {
+          const l = layers[i];
+          if (l.type === 'rect') {
+            if (startX >= l.x && startX <= l.x + l.w && startY >= l.y && startY <= l.y + l.h) {
+              found = l;
+              break;
+            }
+          } else if (l.type === 'circle') {
+            const dist = Math.sqrt((startX - l.x)**2 + (startY - l.y)**2);
+            if (dist <= l.r + 4) {
+              found = l;
+              break;
+            }
+          } else if (l.type === 'text') {
+            ctx.font = `bold ${l.fontSize}px 'Quicksand', sans-serif`;
+            const textMetrics = ctx.measureText(l.text);
+            if (startX >= l.x && startX <= l.x + textMetrics.width && startY >= l.y && startY <= l.y + l.fontSize) {
+              found = l;
+              break;
+            }
+          } else if (l.type === 'stroke') {
+            for (let p of l.points) {
+              const d = Math.sqrt((startX - p.x)**2 + (startY - p.y)**2);
+              if (d <= l.width + 5) {
+                found = l;
+                break;
+              }
+            }
+            if (found) break;
+          }
+        }
+
+        if (found) {
+          selectedObject = found;
+          selectedObject.offsetX = startX - selectedObject.x;
+          selectedObject.offsetY = startY - selectedObject.y;
+          if (selectedObject.type === 'stroke') {
+            selectedObject.startPoints = JSON.parse(JSON.stringify(selectedObject.points));
+          }
+          isDrawing = true;
+        } else {
+          selectedObject = null;
+        }
+        drawWorkspace();
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDrawing) return;
+      const coords = getMouseCoords(e);
+      currentX = coords.x;
+      currentY = coords.y;
+
+      const activeLayer = layers[layers.length - 1];
+
+      if (currentTool === 'draw') {
+        activeLayer.points.push({ x: currentX, y: currentY });
+        drawWorkspace();
+      } else if (currentTool === 'rect') {
+        activeLayer.w = currentX - startX;
+        activeLayer.h = currentY - startY;
+        drawWorkspace();
+      } else if (currentTool === 'circle') {
+        const radius = Math.sqrt((currentX - startX)**2 + (currentY - startY)**2);
+        activeLayer.r = radius;
+        drawWorkspace();
+      } else if (currentTool === 'select' && selectedObject) {
+        if (selectedObject.type === 'stroke') {
+          const dx = currentX - startX;
+          const dy = currentY - startY;
+          selectedObject.points = selectedObject.startPoints.map(p => ({
+            x: p.x + dx,
+            y: p.y + dy
+          }));
+        } else {
+          selectedObject.x = currentX - selectedObject.offsetX;
+          selectedObject.y = currentY - selectedObject.offsetY;
+        }
+        drawWorkspace();
+      }
+    });
+
+    const stopDrawing = () => {
+      if (isDrawing) {
+        isDrawing = false;
+        saveCanvasToAnswers();
+      }
+    };
+
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+
+    drawWorkspace();
+  }
+
+  function initSimProgramacionIDE(qId, q) {
+    if (q.responseType && q.responseType !== 'ide') {
+      return;
+    }
+    const htmlCodeArea = document.getElementById(`sim-code-html-${qId}`);
+    const cssCodeArea = document.getElementById(`sim-code-css-${qId}`);
+    const jsCodeArea = document.getElementById(`sim-code-js-${qId}`);
+    const sqlCodeArea = document.getElementById(`sim-code-sql-${qId}`);
+    const compileBtn = document.getElementById(`sim-btn-compile-${qId}`);
+    const consoleOutput = document.getElementById(`sim-output-console-${qId}`);
+    const previewFrame = document.getElementById(`sim-preview-frame-${qId}`);
+
+    let activeTab = "html";
+
+    document.querySelectorAll(`.sim-tab-btn-${qId}`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const selectedTab = btn.getAttribute('data-tab');
+        activeTab = selectedTab;
+
+        document.querySelectorAll(`.sim-tab-btn-${qId}`).forEach(b => {
+          b.className = `sim-tab-btn-${qId} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900`;
+        });
+        btn.className = `sim-tab-btn-${qId} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 bg-indigo-600 text-white shadow`;
+
+        document.querySelectorAll(`.sim-editor-pane-${qId}`).forEach(pane => {
+          pane.classList.add('hidden');
+        });
+        const activePane = document.getElementById(`sim-pane-${selectedTab}-${qId}`);
+        if (activePane) activePane.classList.remove('hidden');
+
+        saveCurrentCodeState();
+      });
+    });
+
+    function saveCurrentCodeState(compiledOutputValue = "") {
+      const htmlVal = htmlCodeArea ? htmlCodeArea.value : "";
+      const cssVal = cssCodeArea ? cssCodeArea.value : "";
+      const jsVal = jsCodeArea ? jsCodeArea.value : "";
+      const sqlVal = sqlCodeArea ? sqlCodeArea.value : "";
+
+      const newAnswerObj = {
+        html: htmlVal,
+        css: cssVal,
+        js: jsVal,
+        sql: sqlVal,
+        compiledOutput: compiledOutputValue || (simAnswers[qId] && simAnswers[qId].compiledOutput) || "",
+        activeTab: activeTab
+      };
+
+      simAnswers[qId] = newAnswerObj;
+
+      const total = Object.keys(simAnswers).length;
+      const qCount = partsData.reduce((acc, p) => acc + p.questions.length, 0);
+      updateSimProgress(total, qCount);
+    }
+
+    if (compileBtn) {
+      compileBtn.addEventListener('click', () => {
+        const htmlVal = htmlCodeArea ? htmlCodeArea.value : "";
+        const cssVal = cssCodeArea ? cssCodeArea.value : "";
+        const jsVal = jsCodeArea ? jsCodeArea.value : "";
+        const sqlVal = sqlCodeArea ? sqlCodeArea.value : "";
+
+        let outputStr = "";
+
+        if (activeTab === 'js') {
+          outputStr = executeSimJS(jsVal);
+        } else if (activeTab === 'sql') {
+          outputStr = executeSimMockSQL(sqlVal);
+        } else {
+          outputStr = "Páginas cargadas y compiladas con éxito.";
+        }
+
+        if (previewFrame) {
+          const combinedSrc = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>${cssVal}</style>
+            </head>
+            <body style="margin:8px;font-family:sans-serif;color:black;">
+              ${htmlVal}
+              <script>
+                try {
+                  ${jsVal}
+                } catch(e) {
+                  document.body.innerHTML += '<div style="color:red;font-family:monospace;margin-top:10px;">Error: ' + e.message + '</div>';
+                }
+              </script>
+            </body>
+            </html>
+          `;
+          previewFrame.srcdoc = combinedSrc;
+        }
+
+        if (consoleOutput) {
+          consoleOutput.textContent = outputStr;
+        }
+
+        saveCurrentCodeState(outputStr);
+        showPastelAlert("¡Código compilador ejecutado y resultado guardado en simulación!", "Compilador");
+      });
+    }
+
+    [htmlCodeArea, cssCodeArea, jsCodeArea, sqlCodeArea].forEach(area => {
+      if (area) {
+        area.addEventListener('input', () => {
+          saveCurrentCodeState();
+        });
+      }
+    });
+  }
+
+  function executeSimJS(code) {
+    let logs = [];
+    const originalLog = console.log;
+    console.log = function(...args) {
+      logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+    };
+
+    try {
+      const result = eval(code);
+      console.log = originalLog;
+      if (logs.length > 0) {
+        return logs.join('\n');
+      }
+      return result !== undefined ? String(result) : "Code executed successfully with no output.";
+    } catch (err) {
+      console.log = originalLog;
+      return `Error de Ejecución: ${err.message}`;
+    }
+  }
+
+  function executeSimMockSQL(sql) {
+    const query = sql.trim().replace(/\s+/g, ' ');
+    const selectMatch = query.match(/^SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?$/i);
+    if (!selectMatch) {
+      return "Error SQL: Solo consultas SELECT son soportadas en este compilador de simulación (Tablas: users, vacancies).";
+    }
+    const fieldsStr = selectMatch[1].trim();
+    const tableName = selectMatch[2].trim().toLowerCase();
+    const whereStr = selectMatch[3] ? selectMatch[3].trim() : null;
+    const orderByStr = selectMatch[4] ? selectMatch[4].trim() : null;
+
+    const mockDB = {
+      users: [
+        { id: 1, name: "Ana Lopez", role: "Developer", score: 95 },
+        { id: 2, name: "Carlos Ruiz", role: "Designer", score: 88 },
+        { id: 3, name: "Sofia Perez", role: "Developer", score: 92 }
+      ],
+      vacancies: [
+        { id: 1, title: "Frontend Dev", status: "Open" },
+        { id: 2, title: "UI/UX Designer", status: "Closed" }
+      ]
+    };
+
+    if (!mockDB[tableName]) {
+      return `Error SQL: Table "${tableName}" not found. Tables available: users, vacancies`;
+    }
+
+    let rows = [...mockDB[tableName]];
+
+    if (whereStr) {
+      const whereMatch = whereStr.match(/(\w+)\s*(=|!=|>|<)\s*(.+)/);
+      if (whereMatch) {
+        const field = whereMatch[1].trim();
+        const op = whereMatch[2].trim();
+        let val = whereMatch[3].trim().replace(/['"]/g, '');
+        rows = rows.filter(row => {
+          let rowVal = row[field];
+          if (typeof rowVal === 'number') {
+            val = parseFloat(val);
+          }
+          if (op === '=') return rowVal == val;
+          if (op === '!=') return rowVal != val;
+          if (op === '>') return rowVal > val;
+          if (op === '<') return rowVal < val;
+          return true;
+        });
+      }
+    }
+
+    if (orderByStr) {
+      const orderParts = orderByStr.split(' ');
+      const field = orderParts[0].trim();
+      const desc = orderParts[1] && orderParts[1].toUpperCase() === 'DESC';
+      rows.sort((a, b) => {
+        if (a[field] < b[field]) return desc ? 1 : -1;
+        if (a[field] > b[field]) return desc ? -1 : 1;
+        return 0;
+      });
+    }
+
+    let fields = fieldsStr.split(',').map(f => f.trim());
+    if (fields.length === 1 && fields[0] === '*') {
+      fields = Object.keys(mockDB[tableName][0]);
+    }
+
+    const colWidths = {};
+    fields.forEach(f => {
+      colWidths[f] = f.length;
+      rows.forEach(r => {
+        const cellVal = String(r[f] !== undefined ? r[f] : '');
+        if (cellVal.length > colWidths[f]) {
+          colWidths[f] = cellVal.length;
+        }
+      });
+    });
+
+    let output = '';
+    let border = '+';
+    fields.forEach(f => {
+      border += '-'.repeat(colWidths[f] + 2) + '+';
+    });
+    output += border + '\n';
+
+    let headerRow = '|';
+    fields.forEach(f => {
+      headerRow += ' ' + f.toUpperCase().padEnd(colWidths[f]) + ' |';
+    });
+    output += headerRow + '\n' + border + '\n';
+
+    if (rows.length === 0) {
+      let emptyRow = '|';
+      const totalW = fields.reduce((sum, f) => sum + colWidths[f] + 3, 0) - 1;
+      emptyRow += ' No rows returned '.padEnd(totalW) + '|';
+      output += emptyRow + '\n' + border + '\n';
+    } else {
+      rows.forEach(r => {
+        let rowStr = '|';
+        fields.forEach(f => {
+          const cellVal = String(r[f] !== undefined ? r[f] : '');
+          rowStr += ' ' + cellVal.padEnd(colWidths[f]) + ' |';
+        });
+        rowStr += '\n';
+        output += rowStr;
+      });
+      output += border + '\n';
+    }
+
+    return output.trim();
+  }
+
+  if (btnSimSubmit) {
+    btnSimSubmit.addEventListener('click', () => {
+      let qCount = partsData.reduce((acc, p) => acc + p.questions.length, 0);
+      if (Object.keys(simAnswers).length < qCount) {
+        showPastelAlert("Por favor, responde todas las preguntas del examen simulado para ver tus resultados de prueba.", "Aviso");
+        return;
+      }
+
+      // Evaluar respuestas
+      let correctCount = 0;
+      let gradableCount = 0;
+      let reportHtml = "";
+
+      partsData.forEach((part) => {
+        reportHtml += `
+          <div class="border-b border-indigo-100 pb-2 mb-2 mt-4 text-black">
+            <h4 class="text-sm font-bold text-indigo-700">${escapeHTML(part.title)}</h4>
+          </div>
+          <div class="space-y-4">
+        `;
+
+        part.questions.forEach((q) => {
+          const ans = simAnswers[q.id];
+          let statusBadge = "";
+          let comparisonDetails = "";
+
+          if (q.type === 'short') {
+            statusBadge = `
+              <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                <i class="fa-solid fa-circle-info"></i> Evaluación Manual
+              </span>
+            `;
+            comparisonDetails = `
+              <p class="text-xs text-gray-600 mt-1"><strong>Tu respuesta:</strong> ${escapeHTML(ans || "Sin respuesta")}</p>
+            `;
+          } else if (q.type === 'canvas') {
+            statusBadge = `
+              <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                <i class="fa-solid fa-palette"></i> Evaluación Manual
+              </span>
+            `;
+            comparisonDetails = `
+              <div class="mt-2">
+                <p class="text-xs text-gray-600"><strong>Tu lienzo:</strong></p>
+                ${ans ? `<img src="${ans}" class="w-32 h-44 border border-gray-300 rounded shadow-sm mt-1 bg-white animate-pulse" />` : '<span class="text-xs text-rose-500">No dibujado</span>'}
+              </div>
+            `;
+          } else {
+            gradableCount++;
+            let isCorrect = false;
+
+            if (q.type === 'multiple' || q.type === 'boolean') {
+              isCorrect = (String(ans).trim() === String(q.correct || "").trim());
+              comparisonDetails = `
+                <p class="text-xs text-gray-600 mt-1"><strong>Tu respuesta:</strong> ${escapeHTML(ans)}</p>
+                <p class="text-xs text-gray-600"><strong>Respuesta correcta:</strong> ${escapeHTML(q.correct)}</p>
+              `;
+            } else if (q.type === 'programacion') {
+              const respType = q.responseType || 'ide';
+              if (respType === 'multiple' || respType === 'short') {
+                isCorrect = (String(ans).trim() === String(q.correct || "").trim());
+                comparisonDetails = `
+                  <p class="text-xs text-gray-600 mt-1"><strong>Tu respuesta:</strong> ${escapeHTML(ans)}</p>
+                  <p class="text-xs text-gray-600"><strong>Respuesta correcta:</strong> ${escapeHTML(q.correct)}</p>
+                `;
+              } else {
+                // IDE mode
+                if (ans && typeof ans === 'object') {
+                  const compiledMatch = ans.compiledOutput && ans.compiledOutput.trim() === (q.correct || "").trim();
+                  const sqlMatch = ans.sql && ans.sql.trim() === (q.correct || "").trim();
+                  const jsMatch = ans.js && ans.js.trim() === (q.correct || "").trim();
+                  const htmlMatch = ans.html && ans.html.trim() === (q.correct || "").trim();
+                  const cssMatch = ans.css && ans.css.trim() === (q.correct || "").trim();
+
+                  isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(ans) === String(q.correct));
+                } else if (ans) {
+                  isCorrect = (String(ans).trim() === String(q.correct || "").trim());
+                }
+
+                const userRepr = ans && typeof ans === 'object' ? (ans.compiledOutput || ans.sql || ans.js || ans.html || "") : String(ans || "");
+                comparisonDetails = `
+                  <p class="text-xs text-gray-600 mt-1"><strong>Tu output o código:</strong></p>
+                  <pre class="bg-slate-900 text-slate-300 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(userRepr || "Sin output compilado")}</pre>
+                  <p class="text-xs text-gray-600 mt-1"><strong>Output o código correcto esperado:</strong></p>
+                  <pre class="bg-slate-900 text-emerald-400 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(q.correct)}</pre>
+                `;
+              }
+            }
+
+            if (isCorrect) {
+              correctCount++;
+              statusBadge = `
+                <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                  <i class="fa-solid fa-circle-check"></i> Correcto
+                </span>
+              `;
+            } else {
+              statusBadge = `
+                <span class="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                  <i class="fa-solid fa-circle-xmark"></i> Incorrecto
+                </span>
+              `;
+            }
+          }
+
+          reportHtml += `
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-1 text-black">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <span class="text-xs font-semibold text-gray-700">Pregunta: ${escapeHTML(q.text)}</span>
+                ${statusBadge}
+              </div>
+              ${comparisonDetails}
+            </div>
+          `;
+        });
+
+        reportHtml += `</div>`;
+      });
+
+      const scorePercent = gradableCount > 0 ? Math.round((correctCount / gradableCount) * 100) : 100;
+      const scoreHtml = `
+        <div class="text-center bg-indigo-50/60 p-5 rounded-2xl border border-indigo-100 mb-6 text-black">
+          <p class="text-xs text-indigo-500 font-bold uppercase tracking-wider">Calificación Calificable</p>
+          <p class="text-5xl font-extrabold text-indigo-700 mt-1">${correctCount} <span class="text-2xl text-indigo-400">/ ${gradableCount}</span></p>
+          <p class="text-xs text-gray-500 mt-2 font-medium">Porcentaje de acierto: <strong class="text-indigo-600 font-bold">${scorePercent}%</strong></p>
+        </div>
+        <div class="space-y-4">
+          ${reportHtml}
+        </div>
+      `;
+
+      simResultsReport.innerHTML = scoreHtml;
+
+      // Cambiar secciones visualmente
+      simTechSection.classList.add('hidden');
+      simCompletedSection.classList.remove('hidden');
+    });
+  }
+
+  if (btnSimRestart) {
+    btnSimRestart.addEventListener('click', () => {
+      simAnswers = {};
+      clearSimActiveIntervals();
+      simTechSection.classList.remove('hidden');
+      simCompletedSection.classList.add('hidden');
+      renderSimulatedExam();
+    });
+  }
 
   // Inicializar
   await loadExams();
