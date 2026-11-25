@@ -55,6 +55,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     return '';
   }
 
+  const DEFAULT_PROJECT_CONFIG = {
+    yesLabel: "Sí",
+    noLabel: "No",
+    descriptionLabel: "Descripción",
+    linkLabel: "Link",
+    technologiesLabel: "Tecnologías / Frameworks",
+    addLabel: "Agregar otro proyecto"
+  };
+
+  function getProjectConfig(q) {
+    const raw = (q && q.proyectosConfig) || {};
+    const config = {};
+    Object.keys(DEFAULT_PROJECT_CONFIG).forEach(key => {
+      const value = typeof raw[key] === 'string' ? raw[key].trim() : '';
+      config[key] = value || DEFAULT_PROJECT_CONFIG[key];
+    });
+    return config;
+  }
+
+  function normalizeQuestionData(q) {
+    if (!q) return q;
+    if (q.type === 'proyectos') {
+      if (!String(q.text || '').trim()) q.text = "¿Has desarrollado proyectos?";
+      q.proyectosConfig = getProjectConfig(q);
+      if (!Array.isArray(q.options)) q.options = [];
+      if (typeof q.correct !== 'string') q.correct = '';
+    }
+    return q;
+  }
+
   function normalizeSimProjectAnswer(raw) {
     const value = raw && typeof raw === 'object' ? raw : {};
     let projects = [];
@@ -70,12 +100,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
-  function simProjectRowHtml(qId, project = {}) {
+  function simProjectRowHtml(qId, project = {}, config = DEFAULT_PROJECT_CONFIG) {
     return `
       <div class="sim-proj-row grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
-        <textarea rows="1" class="sim-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none resize-y text-black" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
-        <input type="url" class="sim-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none text-black" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
-        <input type="text" class="sim-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none text-black" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
+        <textarea rows="1" class="sim-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none resize-y text-black" placeholder="${escapeHTML(config.descriptionLabel)}" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
+        <input type="url" class="sim-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none text-black" placeholder="${escapeHTML(config.linkLabel)}" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
+        <input type="text" class="sim-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none text-black" placeholder="${escapeHTML(config.technologiesLabel)}" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
         <button type="button" class="sim-proj-remove md:col-span-1 w-9 h-[38px] rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center justify-self-end md:justify-self-auto transition" title="Quitar proyecto">
           <i class="fa-solid fa-xmark text-xs"></i>
         </button>
@@ -365,7 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           partsData = (exam.parts || []).map(p => ({
             ...p,
             title: p.title || "",
-            questions: p.questions || []
+            questions: (p.questions || []).map(normalizeQuestionData)
           }));
           if (partsData.length === 0) {
             partsData = [{ id: "part_" + Date.now(), title: "", questions: [] }];
@@ -619,7 +649,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       block.addEventListener('click', (e) => {
         const idx = parseInt(block.getAttribute('data-idx'));
         // Evitar re-renderizado molesto si el usuario hace click directo en inputs/selects/botones
-        if (e.target.closest('input, select, textarea, button')) {
+        if (e.target.closest('input, select, textarea, button, .drag-question-handle')) {
           lastActivePartIdx = idx;
           return;
         }
@@ -718,20 +748,55 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         `;
       } else if (q.type === 'proyectos') {
+        const cfg = getProjectConfig(q);
         extraHtml = `
-          <div class="mt-2 space-y-2">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] font-bold text-blue-600">¿Has desarrollado proyectos?</span>
-              <span class="px-2.5 py-0.5 rounded-lg bg-blue-500 text-white text-[9px] font-bold">Sí</span>
-              <span class="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[9px] font-bold">No</span>
+          <div class="mt-2 space-y-3">
+            <div class="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-2">
+              <span class="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">Personalizar etiquetas del candidato</span>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-[9px] text-gray-500 block font-semibold">Botón "Sí"</label>
+                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="yesLabel" value="${escapeHTML(cfg.yesLabel)}">
+                </div>
+                <div>
+                  <label class="text-[9px] text-gray-500 block font-semibold">Botón "No"</label>
+                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="noLabel" value="${escapeHTML(cfg.noLabel)}">
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="text-[9px] text-gray-500 block font-semibold">Etiqueta: Descripción</label>
+                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="descriptionLabel" value="${escapeHTML(cfg.descriptionLabel)}">
+                </div>
+                <div>
+                  <label class="text-[9px] text-gray-500 block font-semibold">Etiqueta: Link</label>
+                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="linkLabel" value="${escapeHTML(cfg.linkLabel)}">
+                </div>
+                <div>
+                  <label class="text-[9px] text-gray-500 block font-semibold">Etiqueta: Tecnologías</label>
+                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="technologiesLabel" value="${escapeHTML(cfg.technologiesLabel)}">
+                </div>
+              </div>
+              <div>
+                <label class="text-[9px] text-gray-500 block font-semibold">Texto del botón para agregar otro proyecto</label>
+                <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="addLabel" value="${escapeHTML(cfg.addLabel)}">
+              </div>
             </div>
-            <div class="grid grid-cols-12 gap-2 items-start">
-              <div class="col-span-5 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500">Descripción</div>
-              <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500">Link</div>
-              <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500">Tecnologías</div>
-              <div class="col-span-1 h-9 rounded-lg border border-dashed border-rose-100 bg-rose-50/30"></div>
+
+            <div class="space-y-2">
+              <span class="text-[9px] font-bold text-blue-400 uppercase tracking-wider block">Vista previa</span>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-0.5 rounded-lg bg-blue-500 text-white text-[9px] font-bold" data-preview-key="yesLabel">${escapeHTML(cfg.yesLabel)}</span>
+                <span class="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[9px] font-bold" data-preview-key="noLabel">${escapeHTML(cfg.noLabel)}</span>
+              </div>
+              <div class="grid grid-cols-12 gap-2 items-start">
+                <div class="col-span-5 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 truncate" data-preview-key="descriptionLabel">${escapeHTML(cfg.descriptionLabel)}</div>
+                <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 truncate" data-preview-key="linkLabel">${escapeHTML(cfg.linkLabel)}</div>
+                <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 truncate" data-preview-key="technologiesLabel">${escapeHTML(cfg.technologiesLabel)}</div>
+                <div class="col-span-1 h-9 rounded-lg border border-dashed border-rose-100 bg-rose-50/30"></div>
+              </div>
+              <span class="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600"><i class="fa-solid fa-plus"></i> <span data-preview-key="addLabel">${escapeHTML(cfg.addLabel)}</span></span>
             </div>
-            <span class="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600"><i class="fa-solid fa-plus"></i> Agregar otro proyecto</span>
           </div>
         `;
       } else if (q.type === 'canvas') {
@@ -824,9 +889,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       return `
-        <div class="p-5 bg-blue-50/30 rounded-2xl border border-blue-100/40 relative space-y-3 shadow-sm hover:shadow transition duration-200">
+        <div class="q-card p-5 bg-blue-50/30 rounded-2xl border border-blue-100/40 relative space-y-3 shadow-sm hover:shadow transition duration-200" data-part-idx="${partIdx}" data-q-idx="${qIdx}">
           <!-- Move and Delete Actions -->
           <div class="absolute top-3 right-3 flex items-center gap-2 text-gray-400">
+            <span class="drag-question-handle cursor-grab active:cursor-grabbing p-1 hover:text-indigo-600 transition" draggable="true" data-part-idx="${partIdx}" data-q-idx="${qIdx}" title="Arrastrar y soltar para reordenar">
+              <i class="fa-solid fa-grip-vertical text-xs"></i>
+            </span>
             <button type="button" class="btn-move-q-up p-1 hover:text-indigo-600 transition" data-part-idx="${partIdx}" data-q-idx="${qIdx}" title="Subir Pregunta (Reordenar)">
               <i class="fa-solid fa-arrow-up text-xs"></i>
             </button>
@@ -843,18 +911,17 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
                 q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : q.type === 'proyectos' ? 'bg-blue-100 text-blue-800' : 'bg-indigo-100 text-indigo-800'
               }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : q.type === 'canvas' ? 'Canvas (Ilustrador)' : q.type === 'proyectos' ? 'Proyectos' : 'Programación'}</span>
-              ${q.type === 'proyectos' ? '' : `<span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>`}
+              <span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>
+              <span class="text-[9px] text-gray-300 font-semibold hidden sm:inline"><i class="fa-solid fa-grip-vertical mr-0.5"></i> arrastra para mover</span>
             </div>
-            ${q.type === 'proyectos' ? '' : `
             <input
               type="text"
               value="${escapeHTML(q.text)}"
               class="q-text-input px-4 py-2.5 w-full border border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded-xl text-sm font-semibold text-gray-800"
               data-part-idx="${partIdx}"
               data-q-idx="${qIdx}"
-              placeholder="Escribe el enunciado de la pregunta aquí..."
+              placeholder="${q.type === 'proyectos' ? 'Escribe la pregunta que verá el candidato...' : 'Escribe el enunciado de la pregunta aquí...'}"
             >
-            `}
           </div>
 
           ${extraHtml}
@@ -876,6 +943,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       qObj.questionCode = "";
       qObj.responseType = "ide";
     }
+    if (type === 'proyectos') {
+      qObj.text = "¿Has desarrollado proyectos?";
+      qObj.proyectosConfig = { ...DEFAULT_PROJECT_CONFIG };
+    }
     partsData[partIdx].questions.push(qObj);
     renderParts();
   }
@@ -886,6 +957,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         const partIdx = e.target.getAttribute('data-part-idx');
         const qIdx = e.target.getAttribute('data-q-idx');
         partsData[partIdx].questions[qIdx].text = e.target.value;
+      });
+    });
+
+    document.querySelectorAll('.q-proj-config-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const partIdx = e.target.getAttribute('data-part-idx');
+        const qIdx = e.target.getAttribute('data-q-idx');
+        const key = e.target.getAttribute('data-config-key');
+        const question = partsData[partIdx].questions[qIdx];
+        question.proyectosConfig = question.proyectosConfig || { ...DEFAULT_PROJECT_CONFIG };
+        question.proyectosConfig[key] = e.target.value;
+
+        const card = e.target.closest('.q-card');
+        if (card) {
+          const fallback = DEFAULT_PROJECT_CONFIG[key] || '';
+          card.querySelectorAll(`[data-preview-key="${key}"]`).forEach(el => {
+            el.textContent = e.target.value.trim() || fallback;
+          });
+        }
       });
     });
 
@@ -1008,6 +1098,112 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
+
+    bindQuestionDragAndDrop();
+  }
+
+  let draggedQuestion = null;
+
+  function moveQuestion(srcPartIdx, srcQIdx, dstPartIdx, dstQIdx, insertAfter) {
+    const srcPart = partsData[srcPartIdx];
+    const dstPart = partsData[dstPartIdx];
+    if (!srcPart || !dstPart || !srcPart.questions[srcQIdx]) return;
+    if (srcPartIdx === dstPartIdx && srcQIdx === dstQIdx) return;
+
+    const [question] = srcPart.questions.splice(srcQIdx, 1);
+    let insertAt = dstQIdx;
+    if (srcPartIdx === dstPartIdx && srcQIdx < dstQIdx) insertAt--;
+    if (insertAfter) insertAt++;
+    insertAt = Math.max(0, Math.min(insertAt, dstPart.questions.length));
+    dstPart.questions.splice(insertAt, 0, question);
+
+    lastActivePartIdx = dstPartIdx;
+    renderParts();
+  }
+
+  function moveQuestionToPartEnd(srcPartIdx, srcQIdx, dstPartIdx) {
+    const srcPart = partsData[srcPartIdx];
+    const dstPart = partsData[dstPartIdx];
+    if (!srcPart || !dstPart || !srcPart.questions[srcQIdx]) return;
+
+    const [question] = srcPart.questions.splice(srcQIdx, 1);
+    dstPart.questions.push(question);
+    lastActivePartIdx = dstPartIdx;
+    renderParts();
+  }
+
+  function clearDragStyles() {
+    document.querySelectorAll('.q-card').forEach(card => {
+      card.classList.remove('opacity-40', 'ring-2', 'ring-purple-400', 'ring-offset-2');
+    });
+  }
+
+  function bindQuestionDragAndDrop() {
+    document.querySelectorAll('.drag-question-handle').forEach(handle => {
+      handle.addEventListener('dragstart', (e) => {
+        draggedQuestion = {
+          partIdx: parseInt(handle.getAttribute('data-part-idx')),
+          qIdx: parseInt(handle.getAttribute('data-q-idx'))
+        };
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', JSON.stringify(draggedQuestion));
+        const card = handle.closest('.q-card');
+        if (card) setTimeout(() => card.classList.add('opacity-40'), 0);
+      });
+
+      handle.addEventListener('dragend', () => {
+        draggedQuestion = null;
+        clearDragStyles();
+      });
+    });
+
+    document.querySelectorAll('.q-card').forEach(card => {
+      card.addEventListener('dragover', (e) => {
+        if (!draggedQuestion) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        card.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2');
+      });
+
+      card.addEventListener('dragleave', (e) => {
+        if (!card.contains(e.relatedTarget)) {
+          card.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2');
+        }
+      });
+
+      card.addEventListener('drop', (e) => {
+        if (!draggedQuestion) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const dstPartIdx = parseInt(card.getAttribute('data-part-idx'));
+        const dstQIdx = parseInt(card.getAttribute('data-q-idx'));
+        const rect = card.getBoundingClientRect();
+        const insertAfter = (e.clientY - rect.top) > (rect.height / 2);
+        const source = draggedQuestion;
+        draggedQuestion = null;
+        clearDragStyles();
+        moveQuestion(source.partIdx, source.qIdx, dstPartIdx, dstQIdx, insertAfter);
+      });
+    });
+
+    document.querySelectorAll('.part-questions-list').forEach(list => {
+      list.addEventListener('dragover', (e) => {
+        if (!draggedQuestion) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+
+      list.addEventListener('drop', (e) => {
+        if (!draggedQuestion) return;
+        e.preventDefault();
+        const dstPartIdx = parseInt(list.getAttribute('data-idx'));
+        const source = draggedQuestion;
+        draggedQuestion = null;
+        clearDragStyles();
+        moveQuestionToPartEnd(source.partIdx, source.qIdx, dstPartIdx);
+      });
+    });
   }
 
   // Guardar Examen Técnico definitivo (Paso 3)
@@ -1017,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     ensureParts();
     const sectionsMode = isSectionsMode();
+    partsData.forEach(part => (part.questions || []).forEach(normalizeQuestionData));
 
     // Validaciones
     for (const part of partsData) {
@@ -1196,20 +1393,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             <textarea rows="3" class="sim-tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none text-black" data-q-id="${q.id}"></textarea>
           `;
         } else if (q.type === 'proyectos') {
+          const cfg = getProjectConfig(q);
           const projectState = normalizeSimProjectAnswer(null);
-          const rowsHtml = projectState.projects.map(p => simProjectRowHtml(q.id, p)).join('');
+          const rowsHtml = projectState.projects.map(p => simProjectRowHtml(q.id, p, cfg)).join('');
           widget = `
             <div class="mt-2 space-y-2 sim-proj-block" data-q-id="${q.id}" data-has-project="">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-xs font-semibold text-gray-700">¿Has desarrollado proyectos?</span>
-                <button type="button" class="sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-blue-100 hover:bg-blue-50" data-q-id="${q.id}">Sí</button>
-                <button type="button" class="sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50" data-q-id="${q.id}">No</button>
+                <span class="text-xs font-semibold text-gray-700">${escapeHTML(q.text || '¿Has desarrollado proyectos?')}</span>
+                <button type="button" class="sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-blue-100 hover:bg-blue-50" data-q-id="${q.id}">${escapeHTML(cfg.yesLabel)}</button>
+                <button type="button" class="sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50" data-q-id="${q.id}">${escapeHTML(cfg.noLabel)}</button>
               </div>
               <div class="sim-proj-list space-y-2 hidden" data-q-id="${q.id}">
                 ${rowsHtml}
               </div>
               <button type="button" class="sim-proj-add hidden inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 mt-1" data-q-id="${q.id}">
-                <i class="fa-solid fa-plus"></i> Agregar otro proyecto
+                <i class="fa-solid fa-plus"></i> ${escapeHTML(cfg.addLabel)}
               </button>
             </div>
           `;
@@ -1512,6 +1710,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const qId = block.getAttribute('data-q-id');
       const list = block.querySelector('.sim-proj-list');
       const addBtn = block.querySelector('.sim-proj-add');
+      const projectQuestion = partsData.flatMap(p => p.questions || []).find(item => item.id === qId);
+      const projectConfig = getProjectConfig(projectQuestion);
 
       const sync = () => {
         const hasProject = block.getAttribute('data-has-project');
@@ -1555,7 +1755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         list.classList.toggle('hidden', choice !== 'yes');
         addBtn.classList.toggle('hidden', choice !== 'yes');
         if (choice === 'yes' && !list.querySelector('.sim-proj-row')) {
-          list.insertAdjacentHTML('beforeend', simProjectRowHtml(qId));
+          list.insertAdjacentHTML('beforeend', simProjectRowHtml(qId, {}, projectConfig));
         }
         updateRemoveButtons();
         sync();
@@ -1565,7 +1765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       block.querySelector('.sim-proj-no').addEventListener('click', () => applyChoice('no'));
 
       addBtn.addEventListener('click', () => {
-        list.insertAdjacentHTML('beforeend', simProjectRowHtml(qId));
+        list.insertAdjacentHTML('beforeend', simProjectRowHtml(qId, {}, projectConfig));
         updateRemoveButtons();
         sync();
         const rows = list.querySelectorAll('.sim-proj-row');
@@ -2428,6 +2628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <p class="text-xs text-gray-600 mt-1"><strong>Tu respuesta:</strong> ${escapeHTML(ans || "Sin respuesta")}</p>
             `;
           } else if (q.type === 'proyectos') {
+            const cfg = getProjectConfig(q);
             const raw = ans && typeof ans === 'object' ? ans : {};
             let projects = [];
             if (Array.isArray(raw.projects)) {
@@ -2442,7 +2643,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               </span>
             `;
             if (raw.hasProject === false) {
-              comparisonDetails = `<p class="text-xs text-gray-600 mt-1">No ha desarrollado proyectos.</p>`;
+              comparisonDetails = `<p class="text-xs text-gray-600 mt-1">Respuesta: <strong>${escapeHTML(cfg.noLabel)}</strong></p>`;
             } else if (projects.length === 0) {
               comparisonDetails = `<p class="text-xs text-gray-400 mt-1">Sin respuesta</p>`;
             } else {
@@ -2451,9 +2652,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return `
                   <div class="mt-2 bg-blue-50/40 p-2.5 rounded-xl border border-blue-100 space-y-1">
                     <span class="text-[9px] font-bold text-blue-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
-                    <p class="text-xs text-gray-600"><strong>Descripción:</strong> ${escapeHTML(project.description || "Sin respuesta")}</p>
-                    <p class="text-xs text-gray-600"><strong>Link:</strong> ${linkUrl ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline break-all">${escapeHTML(project.link)}</a>` : escapeHTML(project.link || "Sin respuesta")}</p>
-                    <p class="text-xs text-gray-600"><strong>Tecnologías:</strong> ${escapeHTML(project.technologies || "Sin respuesta")}</p>
+                    <p class="text-xs text-gray-600"><strong>${escapeHTML(cfg.descriptionLabel)}:</strong> ${escapeHTML(project.description || "Sin respuesta")}</p>
+                    <p class="text-xs text-gray-600"><strong>${escapeHTML(cfg.linkLabel)}:</strong> ${linkUrl ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline break-all">${escapeHTML(project.link)}</a>` : escapeHTML(project.link || "Sin respuesta")}</p>
+                    <p class="text-xs text-gray-600"><strong>${escapeHTML(cfg.technologiesLabel)}:</strong> ${escapeHTML(project.technologies || "Sin respuesta")}</p>
                   </div>
                 `;
               }).join('');
@@ -2565,7 +2766,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           reportHtml += `
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-1 text-black">
               <div class="flex items-center justify-between flex-wrap gap-2">
-                <span class="text-xs font-semibold text-gray-700">${q.type === 'proyectos' ? 'Proyecto' : `Pregunta: ${escapeHTML(q.text)}`}</span>
+                <span class="text-xs font-semibold text-gray-700">Pregunta: ${escapeHTML(q.text || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : ''))}</span>
                 ${statusBadge}
               </div>
               ${comparisonDetails}

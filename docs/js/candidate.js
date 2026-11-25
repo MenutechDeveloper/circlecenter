@@ -200,6 +200,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  const DEFAULT_PROJECT_CONFIG = {
+    yesLabel: "Sí",
+    noLabel: "No",
+    descriptionLabel: "Descripción",
+    linkLabel: "Link",
+    technologiesLabel: "Tecnologías / Frameworks",
+    addLabel: "Agregar otro proyecto"
+  };
+
+  function getProjectConfig(q) {
+    const raw = (q && q.proyectosConfig) || {};
+    const config = {};
+    Object.keys(DEFAULT_PROJECT_CONFIG).forEach(key => {
+      const value = typeof raw[key] === 'string' ? raw[key].trim() : '';
+      config[key] = value || DEFAULT_PROJECT_CONFIG[key];
+    });
+    return config;
+  }
+
   function normalizeProjectAnswer(raw) {
     const value = raw && typeof raw === 'object' ? raw : {};
     let projects = [];
@@ -215,12 +234,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
-  function projectRowHtml(qId, project = {}) {
+  function projectRowHtml(qId, project = {}, config = DEFAULT_PROJECT_CONFIG) {
     return `
       <div class="tech-proj-row grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
-        <textarea rows="1" class="tech-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none resize-y" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
-        <input type="url" class="tech-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
-        <input type="text" class="tech-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
+        <textarea rows="1" class="tech-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none resize-y" placeholder="${escapeHTML(config.descriptionLabel)}" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
+        <input type="url" class="tech-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none" placeholder="${escapeHTML(config.linkLabel)}" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
+        <input type="text" class="tech-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none" placeholder="${escapeHTML(config.technologiesLabel)}" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
         <button type="button" class="tech-proj-remove md:col-span-1 w-9 h-[38px] rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center justify-self-end md:justify-self-auto transition" title="Quitar proyecto">
           <i class="fa-solid fa-xmark text-xs"></i>
         </button>
@@ -498,22 +517,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             <textarea rows="3" class="tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none" data-q-id="${q.id}">${escapeHTML(savedVal || '')}</textarea>
           `;
         } else if (q.type === 'proyectos') {
+          const cfg = getProjectConfig(q);
           const projectState = normalizeProjectAnswer(savedVal);
           const isYes = projectState.hasProject === true;
           const isNo = projectState.hasProject === false;
-          const rowsHtml = projectState.projects.map(p => projectRowHtml(q.id, p)).join('');
+          const rowsHtml = projectState.projects.map(p => projectRowHtml(q.id, p, cfg)).join('');
           widget = `
             <div class="mt-2 space-y-2 tech-proj-block" data-q-id="${q.id}" data-has-project="${isYes ? 'true' : isNo ? 'false' : ''}">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-xs font-semibold text-gray-700">¿Has desarrollado proyectos?</span>
-                <button type="button" class="tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isYes ? 'bg-blue-500 text-white border-blue-500 shadow-sm' : 'bg-white text-gray-600 border-blue-100 hover:bg-blue-50'}" data-q-id="${q.id}">Sí</button>
-                <button type="button" class="tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isNo ? 'bg-slate-600 text-white border-slate-600 shadow-sm' : 'bg-white text-gray-600 border-slate-200 hover:bg-slate-50'}" data-q-id="${q.id}">No</button>
+                <span class="text-xs font-semibold text-gray-700">${escapeHTML(q.text || '¿Has desarrollado proyectos?')}</span>
+                <button type="button" class="tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isYes ? 'bg-blue-500 text-white border-blue-500 shadow-sm' : 'bg-white text-gray-600 border-blue-100 hover:bg-blue-50'}" data-q-id="${q.id}">${escapeHTML(cfg.yesLabel)}</button>
+                <button type="button" class="tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isNo ? 'bg-slate-600 text-white border-slate-600 shadow-sm' : 'bg-white text-gray-600 border-slate-200 hover:bg-slate-50'}" data-q-id="${q.id}">${escapeHTML(cfg.noLabel)}</button>
               </div>
               <div class="tech-proj-list space-y-2 ${isYes ? '' : 'hidden'}" data-q-id="${q.id}">
                 ${rowsHtml}
               </div>
               <button type="button" class="tech-proj-add ${isYes ? '' : 'hidden'} inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 mt-1" data-q-id="${q.id}">
-                <i class="fa-solid fa-plus"></i> Agregar otro proyecto
+                <i class="fa-solid fa-plus"></i> ${escapeHTML(cfg.addLabel)}
               </button>
             </div>
           `;
@@ -840,6 +860,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const qId = block.getAttribute('data-q-id');
       const list = block.querySelector('.tech-proj-list');
       const addBtn = block.querySelector('.tech-proj-add');
+      const projectQuestion = (exam.parts || []).flatMap(p => p.questions || []).find(item => item.id === qId);
+      const projectConfig = getProjectConfig(projectQuestion);
 
       const sync = () => {
         const hasProject = block.getAttribute('data-has-project');
@@ -883,7 +905,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         list.classList.toggle('hidden', choice !== 'yes');
         addBtn.classList.toggle('hidden', choice !== 'yes');
         if (choice === 'yes' && !list.querySelector('.tech-proj-row')) {
-          list.insertAdjacentHTML('beforeend', projectRowHtml(qId));
+          list.insertAdjacentHTML('beforeend', projectRowHtml(qId, {}, projectConfig));
         }
         updateRemoveButtons();
         sync();
@@ -893,7 +915,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       block.querySelector('.tech-proj-no').addEventListener('click', () => applyChoice('no'));
 
       addBtn.addEventListener('click', () => {
-        list.insertAdjacentHTML('beforeend', projectRowHtml(qId));
+        list.insertAdjacentHTML('beforeend', projectRowHtml(qId, {}, projectConfig));
         updateRemoveButtons();
         sync();
         const rows = list.querySelectorAll('.tech-proj-row');
