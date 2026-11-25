@@ -64,11 +64,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     addLabel: "Agregar otro proyecto"
   };
 
-  function getProjectConfig(q) {
+  function getProjectConfigRaw(q) {
     const raw = (q && q.proyectosConfig) || {};
     const config = {};
     Object.keys(DEFAULT_PROJECT_CONFIG).forEach(key => {
-      const value = typeof raw[key] === 'string' ? raw[key].trim() : '';
+      config[key] = typeof raw[key] === 'string' ? raw[key] : '';
+    });
+    return config;
+  }
+
+  function getProjectConfig(q) {
+    const raw = getProjectConfigRaw(q);
+    const config = {};
+    Object.keys(DEFAULT_PROJECT_CONFIG).forEach(key => {
+      const value = raw[key].trim();
       config[key] = value || DEFAULT_PROJECT_CONFIG[key];
     });
     return config;
@@ -77,8 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function normalizeQuestionData(q) {
     if (!q) return q;
     if (q.type === 'proyectos') {
-      if (!String(q.text || '').trim()) q.text = "¿Has desarrollado proyectos?";
-      q.proyectosConfig = getProjectConfig(q);
+      q.proyectosConfig = getProjectConfigRaw(q);
       if (!Array.isArray(q.options)) q.options = [];
       if (typeof q.correct !== 'string') q.correct = '';
     }
@@ -748,55 +756,30 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         `;
       } else if (q.type === 'proyectos') {
-        const cfg = getProjectConfig(q);
+        const cfg = getProjectConfigRaw(q);
         extraHtml = `
-          <div class="mt-2 space-y-3">
-            <div class="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-2">
-              <span class="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">Personalizar etiquetas del candidato</span>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="text-[9px] text-gray-500 block font-semibold">Botón "Sí"</label>
-                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="yesLabel" value="${escapeHTML(cfg.yesLabel)}">
-                </div>
-                <div>
-                  <label class="text-[9px] text-gray-500 block font-semibold">Botón "No"</label>
-                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="noLabel" value="${escapeHTML(cfg.noLabel)}">
-                </div>
-              </div>
-              <div class="grid grid-cols-3 gap-2">
-                <div>
-                  <label class="text-[9px] text-gray-500 block font-semibold">Etiqueta: Descripción</label>
-                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="descriptionLabel" value="${escapeHTML(cfg.descriptionLabel)}">
-                </div>
-                <div>
-                  <label class="text-[9px] text-gray-500 block font-semibold">Etiqueta: Link</label>
-                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="linkLabel" value="${escapeHTML(cfg.linkLabel)}">
-                </div>
-                <div>
-                  <label class="text-[9px] text-gray-500 block font-semibold">Etiqueta: Tecnologías</label>
-                  <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="technologiesLabel" value="${escapeHTML(cfg.technologiesLabel)}">
-                </div>
-              </div>
-              <div>
-                <label class="text-[9px] text-gray-500 block font-semibold">Texto del botón para agregar otro proyecto</label>
-                <input type="text" class="q-proj-config-input w-full px-2 py-1 border border-blue-100 focus:outline-none rounded-lg text-xs" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="addLabel" value="${escapeHTML(cfg.addLabel)}">
-              </div>
+          <div class="mt-2 space-y-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value="${escapeHTML(q.text || '')}"
+                class="q-text-input flex-1 min-w-[160px] px-2 py-1 rounded-lg border border-dashed border-blue-200 bg-blue-50/30 text-[10px] font-bold text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                data-part-idx="${partIdx}"
+                data-q-idx="${qIdx}"
+              >
+              <input type="text" value="${escapeHTML(cfg.yesLabel)}" class="q-proj-config-input px-2.5 py-0.5 rounded-lg bg-blue-500 text-white text-[9px] font-bold text-center w-16 focus:outline-none focus:ring-2 focus:ring-blue-300" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="yesLabel">
+              <input type="text" value="${escapeHTML(cfg.noLabel)}" class="q-proj-config-input px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[9px] font-bold text-center w-16 focus:outline-none focus:ring-2 focus:ring-slate-300" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="noLabel">
             </div>
-
-            <div class="space-y-2">
-              <span class="text-[9px] font-bold text-blue-400 uppercase tracking-wider block">Vista previa</span>
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-2.5 py-0.5 rounded-lg bg-blue-500 text-white text-[9px] font-bold" data-preview-key="yesLabel">${escapeHTML(cfg.yesLabel)}</span>
-                <span class="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[9px] font-bold" data-preview-key="noLabel">${escapeHTML(cfg.noLabel)}</span>
-              </div>
-              <div class="grid grid-cols-12 gap-2 items-start">
-                <div class="col-span-5 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 truncate" data-preview-key="descriptionLabel">${escapeHTML(cfg.descriptionLabel)}</div>
-                <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 truncate" data-preview-key="linkLabel">${escapeHTML(cfg.linkLabel)}</div>
-                <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 truncate" data-preview-key="technologiesLabel">${escapeHTML(cfg.technologiesLabel)}</div>
-                <div class="col-span-1 h-9 rounded-lg border border-dashed border-rose-100 bg-rose-50/30"></div>
-              </div>
-              <span class="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600"><i class="fa-solid fa-plus"></i> <span data-preview-key="addLabel">${escapeHTML(cfg.addLabel)}</span></span>
+            <div class="grid grid-cols-12 gap-2 items-start">
+              <input type="text" value="${escapeHTML(cfg.descriptionLabel)}" class="q-proj-config-input col-span-5 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="descriptionLabel">
+              <input type="text" value="${escapeHTML(cfg.linkLabel)}" class="q-proj-config-input col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="linkLabel">
+              <input type="text" value="${escapeHTML(cfg.technologiesLabel)}" class="q-proj-config-input col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="technologiesLabel">
+              <div class="col-span-1 h-9 rounded-lg border border-dashed border-rose-100 bg-rose-50/30"></div>
             </div>
+            <span class="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600">
+              <i class="fa-solid fa-plus"></i>
+              <input type="text" value="${escapeHTML(cfg.addLabel)}" class="q-proj-config-input w-40 bg-transparent border-b border-dashed border-blue-200 text-[10px] font-bold text-blue-600 focus:outline-none focus:border-blue-500" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="addLabel">
+            </span>
           </div>
         `;
       } else if (q.type === 'canvas') {
@@ -911,17 +894,18 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
                 q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : q.type === 'proyectos' ? 'bg-blue-100 text-blue-800' : 'bg-indigo-100 text-indigo-800'
               }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : q.type === 'canvas' ? 'Canvas (Ilustrador)' : q.type === 'proyectos' ? 'Proyectos' : 'Programación'}</span>
-              <span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>
-              <span class="text-[9px] text-gray-300 font-semibold hidden sm:inline"><i class="fa-solid fa-grip-vertical mr-0.5"></i> arrastra para mover</span>
+              ${q.type === 'proyectos' ? '' : `<span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>`}
             </div>
+            ${q.type === 'proyectos' ? '' : `
             <input
               type="text"
               value="${escapeHTML(q.text)}"
               class="q-text-input px-4 py-2.5 w-full border border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded-xl text-sm font-semibold text-gray-800"
               data-part-idx="${partIdx}"
               data-q-idx="${qIdx}"
-              placeholder="${q.type === 'proyectos' ? 'Escribe la pregunta que verá el candidato...' : 'Escribe el enunciado de la pregunta aquí...'}"
+              placeholder="Escribe el enunciado de la pregunta aquí..."
             >
+            `}
           </div>
 
           ${extraHtml}
@@ -944,8 +928,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       qObj.responseType = "ide";
     }
     if (type === 'proyectos') {
-      qObj.text = "¿Has desarrollado proyectos?";
-      qObj.proyectosConfig = { ...DEFAULT_PROJECT_CONFIG };
+      qObj.proyectosConfig = getProjectConfigRaw({});
     }
     partsData[partIdx].questions.push(qObj);
     renderParts();
@@ -966,16 +949,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const qIdx = e.target.getAttribute('data-q-idx');
         const key = e.target.getAttribute('data-config-key');
         const question = partsData[partIdx].questions[qIdx];
-        question.proyectosConfig = question.proyectosConfig || { ...DEFAULT_PROJECT_CONFIG };
+        question.proyectosConfig = question.proyectosConfig || getProjectConfigRaw({});
         question.proyectosConfig[key] = e.target.value;
-
-        const card = e.target.closest('.q-card');
-        if (card) {
-          const fallback = DEFAULT_PROJECT_CONFIG[key] || '';
-          card.querySelectorAll(`[data-preview-key="${key}"]`).forEach(el => {
-            el.textContent = e.target.value.trim() || fallback;
-          });
-        }
       });
     });
 
