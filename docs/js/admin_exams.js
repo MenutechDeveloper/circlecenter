@@ -46,6 +46,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, "&#039;");
   }
 
+  function normalizeUrl(url) {
+    const trimmed = String(url || '').trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^[\w-]+(\.[\w-]+)+([\/?#].*)?$/.test(trimmed)) return 'https://' + trimmed;
+    return '';
+  }
+
   function beautifyCode(code) {
     if (!code) return "";
     let lines = code.split('\n');
@@ -142,6 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const specialsToggleBtn = document.getElementById('specials-toggle-btn');
   const sidebarAddCanvasBtn = document.getElementById('sidebar-add-canvas');
   const sidebarAddProgramacionBtn = document.getElementById('sidebar-add-programacion');
+  const sidebarAddProyectosBtn = document.getElementById('sidebar-add-proyectos');
 
   if (specialsToggleBtn && specialsSidebar) {
     specialsToggleBtn.addEventListener('click', (e) => {
@@ -194,6 +203,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         lastActivePartIdx = partsData.length - 1;
       }
       addQuestionToPart(lastActivePartIdx, 'canvas');
+
+      // Cerrar sidebar después de agregar
+      if (specialsSidebar) {
+        specialsSidebar.classList.remove('translate-x-0');
+        specialsSidebar.classList.add('-translate-x-[260px]');
+      }
+    });
+  }
+
+  if (sidebarAddProyectosBtn) {
+    sidebarAddProyectosBtn.addEventListener('click', () => {
+      if (partsData.length === 0) {
+        showPastelAlert("Por favor, agrega al menos una sección primero antes de insertar una pregunta especial.", "Aviso");
+        return;
+      }
+      if (lastActivePartIdx >= partsData.length) {
+        lastActivePartIdx = partsData.length - 1;
+      }
+      addQuestionToPart(lastActivePartIdx, 'proyectos');
 
       // Cerrar sidebar después de agregar
       if (specialsSidebar) {
@@ -590,6 +618,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             <i class="fa-solid fa-circle-info"></i> Pregunta abierta. El reclutador analizará y evaluará la respuesta de forma libre.
           </div>
         `;
+      } else if (q.type === 'proyectos') {
+        extraHtml = `
+          <div class="mt-2 grid grid-cols-1 gap-2">
+            <div class="bg-white rounded-xl border border-teal-100 p-2.5">
+              <span class="text-[9px] font-bold text-teal-600 uppercase tracking-wide">Descripción</span>
+              <div class="mt-1.5 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30"></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div class="bg-white rounded-xl border border-teal-100 p-2.5">
+                <span class="text-[9px] font-bold text-teal-600 uppercase tracking-wide">Link de proyectos</span>
+                <div class="mt-1.5 h-7 rounded-lg border border-dashed border-teal-100 bg-teal-50/30"></div>
+              </div>
+              <div class="bg-white rounded-xl border border-teal-100 p-2.5">
+                <span class="text-[9px] font-bold text-teal-600 uppercase tracking-wide">Tecnologías / Frameworks utilizados</span>
+                <div class="mt-1.5 h-7 rounded-lg border border-dashed border-teal-100 bg-teal-50/30"></div>
+              </div>
+            </div>
+          </div>
+        `;
       } else if (q.type === 'canvas') {
         extraHtml = `
           <div class="mt-2 text-[10px] text-purple-600 bg-purple-50 p-3 rounded-xl border border-purple-100 flex flex-col gap-1">
@@ -696,10 +743,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div>
             <div class="flex items-center gap-2 mb-1.5 select-none">
               <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
-                q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : 'bg-indigo-100 text-indigo-800'
-              }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : q.type === 'canvas' ? 'Canvas (Ilustrador)' : 'Programación'}</span>
-              <span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>
+                q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : q.type === 'proyectos' ? 'bg-teal-100 text-teal-800' : 'bg-indigo-100 text-indigo-800'
+              }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : q.type === 'canvas' ? 'Canvas (Ilustrador)' : q.type === 'proyectos' ? 'Proyectos' : 'Programación'}</span>
+              ${q.type === 'proyectos' ? '' : `<span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>`}
             </div>
+            ${q.type === 'proyectos' ? '' : `
             <input
               type="text"
               value="${q.text}"
@@ -708,6 +756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               data-q-idx="${qIdx}"
               placeholder="Escribe el enunciado de la pregunta aquí..."
             >
+            `}
           </div>
 
           ${extraHtml}
@@ -884,7 +933,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       for (const q of part.questions) {
-        if (!q.text.trim()) {
+        if (q.type !== 'proyectos' && !(q.text || '').trim()) {
           showAlert(`La sección "${part.title}" tiene enunciados vacíos.`, true);
           return;
         }
@@ -906,10 +955,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
+      const existingExam = currentExamId ? allExams.find(e => e.id === currentExamId) : null;
       const payload = {
         name,
         description,
-        is_psychometric: false,
+        is_psychometric: existingExam ? existingExam.is_psychometric === true : false,
         parts: partsData
       };
 
@@ -1048,6 +1098,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (q.type === 'short') {
           widget = `
             <textarea rows="3" class="sim-tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none text-black" data-q-id="${q.id}"></textarea>
+          `;
+        } else if (q.type === 'proyectos') {
+          widget = `
+            <div class="mt-2 grid grid-cols-1 gap-2">
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Descripción</label>
+                <textarea rows="2" class="sim-proj-description w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" data-q-id="${q.id}"></textarea>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Link de proyectos</label>
+                  <input type="url" placeholder="https://" class="sim-proj-link w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" data-q-id="${q.id}">
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Tecnologías / Frameworks utilizados</label>
+                  <input type="text" class="sim-proj-tech w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" data-q-id="${q.id}">
+                </div>
+              </div>
+            </div>
           `;
         } else if (q.type === 'programacion') {
           const respType = q.responseType || 'ide';
@@ -1306,7 +1375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         partHtml += `
           <div class="space-y-1 bg-white p-5 rounded-2xl border border-blue-50 shadow-sm text-black">
-            <span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed">Pregunta: ${escapeHTML(q.text)}</span>
+            ${q.type === 'proyectos' ? '' : `<span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed">Pregunta: ${escapeHTML(q.text)}</span>`}
             ${widget}
           </div>
         `;
@@ -1341,6 +1410,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         const total = Object.keys(simAnswers).length;
         updateSimProgress(total, qCount);
+      });
+    });
+
+    document.querySelectorAll('.sim-proj-description, .sim-proj-link, .sim-proj-tech').forEach(el => {
+      el.addEventListener('input', () => {
+        const qId = el.getAttribute('data-q-id');
+        const desc = document.querySelector(`.sim-proj-description[data-q-id="${qId}"]`);
+        const link = document.querySelector(`.sim-proj-link[data-q-id="${qId}"]`);
+        const tech = document.querySelector(`.sim-proj-tech[data-q-id="${qId}"]`);
+        const project = {
+          description: desc ? desc.value.trim() : '',
+          link: link ? link.value.trim() : '',
+          technologies: tech ? tech.value.trim() : ''
+        };
+        if (project.description || project.link || project.technologies) {
+          simAnswers[qId] = project;
+        } else {
+          delete simAnswers[qId];
+        }
+        updateSimProgress(Object.keys(simAnswers).length, qCount);
       });
     });
 
@@ -2136,8 +2225,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (btnSimSubmit) {
     btnSimSubmit.addEventListener('click', () => {
-      let qCount = partsData.reduce((acc, p) => acc + p.questions.length, 0);
-      if (Object.keys(simAnswers).length < qCount) {
+      const missingRequired = partsData.reduce((acc, p) =>
+        acc + p.questions.filter(q => q.type !== 'proyectos' && !simAnswers[q.id]).length, 0);
+      if (missingRequired > 0) {
         showPastelAlert("Por favor, responde todas las preguntas del examen simulado para ver tus resultados de prueba.", "Aviso");
         return;
       }
@@ -2168,6 +2258,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             comparisonDetails = `
               <p class="text-xs text-gray-600 mt-1"><strong>Tu respuesta:</strong> ${escapeHTML(ans || "Sin respuesta")}</p>
+            `;
+          } else if (q.type === 'proyectos') {
+            const project = ans && typeof ans === 'object' ? ans : {};
+            const linkUrl = normalizeUrl(project.link);
+            statusBadge = `
+              <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                <i class="fa-solid fa-folder-open"></i> Evaluación Manual
+              </span>
+            `;
+            comparisonDetails = `
+              <p class="text-xs text-gray-600 mt-1"><strong>Descripción:</strong> ${escapeHTML(project.description || "Sin respuesta")}</p>
+              <p class="text-xs text-gray-600"><strong>Link:</strong> ${linkUrl ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline break-all">${escapeHTML(project.link)}</a>` : escapeHTML(project.link || "Sin respuesta")}</p>
+              <p class="text-xs text-gray-600"><strong>Tecnologías:</strong> ${escapeHTML(project.technologies || "Sin respuesta")}</p>
             `;
           } else if (q.type === 'canvas') {
             statusBadge = `
@@ -2242,7 +2345,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           reportHtml += `
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-1 text-black">
               <div class="flex items-center justify-between flex-wrap gap-2">
-                <span class="text-xs font-semibold text-gray-700">Pregunta: ${escapeHTML(q.text)}</span>
+                <span class="text-xs font-semibold text-gray-700">${q.type === 'proyectos' ? 'Proyecto' : `Pregunta: ${escapeHTML(q.text)}`}</span>
                 ${statusBadge}
               </div>
               ${comparisonDetails}

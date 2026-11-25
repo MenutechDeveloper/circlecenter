@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeCandidates.forEach(cand => {
           let examsLabel = "Sin exámenes asignados";
           if (cand.assigned_exams && Array.isArray(cand.assigned_exams) && cand.assigned_exams.length > 0) {
-            examsLabel = cand.assigned_exams.map(e => e.name).join(', ');
+            examsLabel = cand.assigned_exams.map((e, i) => `${i + 1}. ${e.name}`).join(' → ');
           } else if (cand.assigned_exam_name) {
             examsLabel = cand.assigned_exam_name;
           }
@@ -110,6 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Cargar estructura de exámenes y formulario
     await loadRequiredResources();
     renderDynamicForm();
+    updateInfoSubmitLabel();
 
     showStep(stepInfoForm);
   });
@@ -117,8 +118,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Carga paralela de base de datos
   async function loadRequiredResources() {
     try {
-      // 1. Asegurar examen psicométrico por defecto y cargarlo
-      await ensureDefaultPsychometricExam();
+      // 1. Cargar el examen psicométrico solo si el administrador lo marcó como obligatorio
+      psychometricExam = null;
       const { data: psyData } = await supabaseClient
         .from('exams')
         .select('*')
@@ -172,6 +173,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  function hasPsychometricExam() {
+    return !!(psychometricExam && Array.isArray(psychometricExam.parts) &&
+      psychometricExam.parts.some(p => Array.isArray(p.questions) && p.questions.length > 0));
+  }
+
+  function startTechnicalExams() {
+    if (assignedTechnicalExamsList.length > 0) {
+      currentTechnicalExamIndex = 0;
+      renderTechnicalExam();
+      showStep(stepTechnical);
+    } else {
+      saveAndFinish();
+    }
+  }
+
+  function updateInfoSubmitLabel() {
+    const submitBtn = candInfoForm.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.textContent = hasPsychometricExam()
+        ? "Continuar al Examen Psicométrico"
+        : "Continuar al Examen";
     }
   }
 
@@ -232,7 +257,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     renderPsychometricExam();
-    showStep(stepPsychometric);
+    if (hasPsychometricExam()) {
+      showStep(stepPsychometric);
+    } else {
+      startTechnicalExams();
+    }
   });
 
   // ==========================================
@@ -354,13 +383,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    if (assignedTechnicalExamsList.length > 0) {
-      currentTechnicalExamIndex = 0;
-      renderTechnicalExam();
-      showStep(stepTechnical);
-    } else {
-      saveAndFinish();
-    }
+    startTechnicalExams();
   });
 
 
@@ -439,6 +462,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (q.type === 'short') {
           widget = `
             <textarea rows="3" class="tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none" data-q-id="${q.id}">${savedVal}</textarea>
+          `;
+        } else if (q.type === 'proyectos') {
+          const savedProject = (savedVal && typeof savedVal === 'object') ? savedVal : {};
+          widget = `
+            <div class="mt-2 grid grid-cols-1 gap-2">
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Descripción</label>
+                <textarea rows="2" class="tech-proj-description w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" data-q-id="${q.id}">${escapeHTML(savedProject.description || '')}</textarea>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Link de proyectos</label>
+                  <input type="url" placeholder="https://" class="tech-proj-link w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" data-q-id="${q.id}" value="${escapeHTML(savedProject.link || '')}">
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Tecnologías / Frameworks utilizados</label>
+                  <input type="text" class="tech-proj-tech w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" data-q-id="${q.id}" value="${escapeHTML(savedProject.technologies || '')}">
+                </div>
+              </div>
+            </div>
           `;
         } else if (q.type === 'programacion') {
           const respType = q.responseType || 'ide';
@@ -701,7 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         partHtml += `
           <div class="space-y-1">
-            <span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed">Pregunta: ${escapeHTML(q.text)}</span>
+            ${q.type === 'proyectos' ? '' : `<span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed">Pregunta: ${escapeHTML(q.text)}</span>`}
             ${widget}
           </div>
         `;
@@ -758,32 +801,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateProgress(techProgressText, total, qCount);
       });
     });
+
+    document.querySelectorAll('.tech-proj-description, .tech-proj-link, .tech-proj-tech').forEach(el => {
+      el.addEventListener('input', () => {
+        const qId = el.getAttribute('data-q-id');
+        const desc = techQuestionsContainer.querySelector(`.tech-proj-description[data-q-id="${qId}"]`);
+        const link = techQuestionsContainer.querySelector(`.tech-proj-link[data-q-id="${qId}"]`);
+        const tech = techQuestionsContainer.querySelector(`.tech-proj-tech[data-q-id="${qId}"]`);
+        const project = {
+          description: desc ? desc.value.trim() : '',
+          link: link ? link.value.trim() : '',
+          technologies: tech ? tech.value.trim() : ''
+        };
+        if (project.description || project.link || project.technologies) {
+          currentAnswers[qId] = project;
+        } else {
+          delete currentAnswers[qId];
+        }
+        updateProgress(techProgressText, Object.keys(currentAnswers).length, qCount);
+      });
+    });
   }
 
   btnSubmitTech.addEventListener('click', () => {
     const exam = assignedTechnicalExamsList[currentTechnicalExamIndex];
     if (!exam) return;
 
-    let totalQuestions = 0;
-    if (exam.parts) {
-      exam.parts.forEach(p => totalQuestions += p.questions.length);
-    }
-
+    // Los bloques de proyectos son opcionales: un candidato sin proyecto puede avanzar.
     const currentAnswers = technicalAnswersByExam[exam.id] || {};
-    if (Object.keys(currentAnswers).length < totalQuestions) {
+    let missingRequired = 0;
+    (exam.parts || []).forEach(p => p.questions.forEach(q => {
+      if (q.type !== 'proyectos' && !currentAnswers[q.id]) missingRequired++;
+    }));
+    if (missingRequired > 0) {
       showPastelAlert("Por favor, responde todas las preguntas de este examen técnico para poder avanzar.");
       return;
     }
 
-    // Si hay más exámenes técnicos en la lista, pasar al siguiente
+    // Si hay más exámenes técnicos en la lista, pasar al siguiente automáticamente
     if (currentTechnicalExamIndex < assignedTechnicalExamsList.length - 1) {
-      showPastelConfirm("¿Deseas guardar tus respuestas de este examen y continuar al siguiente?", (accepted) => {
-        if (accepted) {
-          currentTechnicalExamIndex++;
-          renderTechnicalExam();
-          techQuestionsContainer.scrollTop = 0;
-        }
-      }, "Siguiente Examen");
+      currentTechnicalExamIndex++;
+      renderTechnicalExam();
+      techQuestionsContainer.scrollTop = 0;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       showPastelConfirm("¿Estás seguro de enviar tus respuestas y finalizar todo el proceso?", (accepted) => {
         if (accepted) {
@@ -822,7 +882,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           part.title = `${exam.name} - ${part.title}`;
           part.questions.forEach(q => {
             q.userAnswer = examAnswers[q.id] || "";
-            if (q.type !== 'short') {
+            const isGradable = q.type === 'multiple' || q.type === 'boolean' || q.type === 'programacion';
+            if (isGradable) {
               consolidatedMaxScore++;
               let isCorrect = false;
               if (q.type === 'programacion') {
