@@ -183,7 +183,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const techParts = (report.technical_answers && report.technical_answers.parts) || [];
     techParts.forEach(part => {
       part.questions.forEach(q => {
-        if (q.type !== 'short') {
+        const isGradable = q.type === 'multiple' || q.type === 'boolean' || q.type === 'programacion';
+        if (isGradable) {
           totalQuestions++;
           if (q.type === 'programacion') {
             const respType = q.responseType || 'ide';
@@ -225,19 +226,18 @@ document.addEventListener('DOMContentLoaded', async () => {
               incorrect++;
             }
           }
-        } else {
-          totalQuestions++;
-          const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
-          if (ans === "") {
-            empty++;
-          }
         }
       });
     });
 
     const scorePct = totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 100;
-    modalCandScore.textContent = `${correct} bien, ${incorrect} mal, ${empty} vacías de ${totalQuestions}`;
-    modalCandPercentage.textContent = `${scorePct}%`;
+    if (totalQuestions > 0) {
+      modalCandScore.textContent = `${correct} bien, ${incorrect} mal, ${empty} vacías de ${totalQuestions}`;
+      modalCandPercentage.textContent = `${scorePct}%`;
+    } else {
+      modalCandScore.textContent = "Evaluación cualitativa";
+      modalCandPercentage.textContent = "—";
+    }
 
     // Formulario de Registro Dinámico render
     modalCandInfoFields.innerHTML = "";
@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
 
       part.questions.forEach((q, idx) => {
-        const hasCorrect = q.type !== 'short' && q.type !== 'canvas';
+        const hasCorrect = q.type !== 'short' && q.type !== 'canvas' && q.type !== 'proyectos';
         let isCorrect = hasCorrect && (q.userAnswer === q.correct);
         if (q.type === 'programacion') {
           const respType = q.responseType || 'ide';
@@ -311,7 +311,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         let badge = "";
-        if (q.type === 'canvas') {
+        if (q.type === 'proyectos') {
+          badge = `<span class="text-[9px] font-bold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-100"><i class="fa-solid fa-folder-open text-teal-500"></i> Proyectos</span>`;
+        } else if (q.type === 'canvas') {
           badge = `<span class="text-[9px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-100"><i class="fa-solid fa-palette text-purple-500"></i> Diseño Canvas</span>`;
         } else if (q.type === 'programacion') {
           badge = `<span class="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100"><i class="fa-solid fa-code text-indigo-500"></i> Programación</span> ${isCorrect ? '<span class="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-check"></i> Correcto</span>' : '<span class="text-[9px] font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100"><i class="fa-solid fa-xmark"></i> Incorrecto</span>'}`;
@@ -324,7 +326,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         let answerWidget = "";
-        if (q.type === 'canvas') {
+        if (q.type === 'proyectos') {
+          const project = q.userAnswer && typeof q.userAnswer === 'object' ? q.userAnswer : {};
+          const linkUrl = normalizeUrl(project.link);
+          answerWidget = `
+            <div class="col-span-2 mt-1 space-y-2">
+              <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs">
+                <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Descripción</strong>
+                <span class="font-medium text-gray-700 whitespace-pre-wrap">${escapeHTML(project.description || 'Sin responder')}</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100">
+                  <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Link de proyectos</strong>
+                  ${linkUrl
+                    ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-600 hover:text-blue-700 underline break-all inline-flex items-center gap-1"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>${escapeHTML(project.link)}</a>`
+                    : `<span class="font-medium text-gray-400">${escapeHTML(project.link || 'Sin responder')}</span>`}
+                </div>
+                <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100">
+                  <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Tecnologías / Frameworks utilizados</strong>
+                  <span class="font-medium text-gray-700">${escapeHTML(project.technologies || 'Sin responder')}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        } else if (q.type === 'canvas') {
           if (q.userAnswer && q.userAnswer.startsWith('data:image/')) {
             answerWidget = `
               <div class="col-span-2 bg-slate-900 p-3 rounded-2xl border border-slate-800 flex flex-col items-center gap-2 max-w-sm mx-auto shadow-inner mt-1">
@@ -411,7 +436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         partHtml += `
           <div class="pt-2 space-y-1">
             <div class="flex justify-between items-start gap-4">
-              <span class="text-xs font-bold text-gray-700">${idx + 1}. ${escapeHTML(q.text)}</span>
+              <span class="text-xs font-bold text-gray-700">${idx + 1}. ${q.type === 'proyectos' ? 'Proyecto' : escapeHTML(q.text)}</span>
               ${badge}
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
@@ -502,6 +527,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function normalizeUrl(url) {
+    const trimmed = String(url || '').trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^[\w-]+(\.[\w-]+)+([\/?#].*)?$/.test(trimmed)) return 'https://' + trimmed;
+    return '';
   }
 
   // Inicializar

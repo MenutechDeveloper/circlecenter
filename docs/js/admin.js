@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {}
   }
 
-  // Asegurar que existan datos obligatorios en Supabase
+  // Asegurar datos base en Supabase
   await ensureDefaultPsychometricExam();
   await ensureDefaultRegistrationForm();
 
@@ -106,9 +106,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
       });
 
-      // Bind checking changes
+      // Bind checking changes (el orden de selección define el orden de los exámenes)
       document.querySelectorAll('.cand-exam-checkbox').forEach(chk => {
         chk.addEventListener('change', () => {
+          const id = chk.value;
+          const name = chk.getAttribute('data-name');
+          if (chk.checked) {
+            if (!selectedExams.some(e => e.id === id)) {
+              selectedExams.push({ id, name });
+            }
+          } else {
+            selectedExams = selectedExams.filter(e => e.id !== id);
+          }
           updateSelectedExamsText();
         });
       });
@@ -120,19 +129,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function updateSelectedExamsText() {
-    selectedExams = [];
-    document.querySelectorAll('.cand-exam-checkbox:checked').forEach(chk => {
-      selectedExams.push({
-        id: chk.value,
-        name: chk.getAttribute('data-name')
-      });
-    });
-
     if (selectedExams.length === 0) {
       selectedExamsText.textContent = '-- Seleccionar Examen --';
       selectedExamsText.className = 'text-gray-400 text-sm';
     } else {
-      selectedExamsText.textContent = selectedExams.map(e => e.name).join(', ');
+      selectedExamsText.textContent = selectedExams.map((e, i) => `${i + 1}. ${e.name}`).join('  →  ');
       selectedExamsText.className = 'text-gray-700 text-sm font-semibold truncate max-w-[90%]';
     }
   }
@@ -173,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Un candidato puede tener assigned_exams como JSONB array, o el viejo formato
       let examText = "Sin examen técnico";
       if (cand.assigned_exams && Array.isArray(cand.assigned_exams) && cand.assigned_exams.length > 0) {
-        examText = cand.assigned_exams.map(e => e.name).join(', ');
+        examText = cand.assigned_exams.map((e, i) => `${i + 1}. ${e.name}`).join(' → ');
       } else if (cand.assigned_exam_name) {
         examText = cand.assigned_exam_name;
       }
@@ -280,6 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Desmarcar todos los checkboxes del dropdown
       document.querySelectorAll('.cand-exam-checkbox').forEach(chk => chk.checked = false);
+      selectedExams = [];
       updateSelectedExamsText();
 
       loadPendingCandidates();

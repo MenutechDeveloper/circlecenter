@@ -103,28 +103,29 @@ async function ensureDefaultPsychometricExam() {
   try {
     const { data, error } = await supabaseClient
       .from('exams')
-      .select('id')
-      .eq('is_psychometric', true)
-      .limit(1);
+      .select('id, name, is_psychometric');
 
     if (error) {
       console.error("Error al buscar examen psicométrico:", error);
       return null;
     }
 
-    if (!data || data.length === 0) {
-      const { data: inserted, error: insertError } = await supabaseClient
-        .from('exams')
-        .insert([DEFAULT_PSYCHOMETRIC_EXAM])
-        .select();
-
-      if (insertError) {
-        console.error("Error al insertar examen psicométrico por defecto:", insertError);
-        return null;
-      }
-      return inserted[0];
+    // Reutilizar el examen existente aunque ya no sea obligatorio
+    const existing = (data || []).find(e => e.is_psychometric || /psicom/i.test(e.name || ''));
+    if (existing) {
+      return existing;
     }
-    return data[0];
+
+    const { data: inserted, error: insertError } = await supabaseClient
+      .from('exams')
+      .insert([DEFAULT_PSYCHOMETRIC_EXAM])
+      .select();
+
+    if (insertError) {
+      console.error("Error al insertar examen psicométrico por defecto:", insertError);
+      return null;
+    }
+    return inserted[0];
   } catch (err) {
     console.error("Fallo inesperado al asegurar examen psicométrico:", err);
     return null;
