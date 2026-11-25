@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalCloseBtn = document.getElementById('modal-close-btn');
   const modalCloseBottomBtn = document.getElementById('modal-close-bottom-btn');
   const modalPrintBtn = document.getElementById('modal-print-btn');
+  const modalShareBtn = document.getElementById('modal-share-btn');
   const modalDeleteBtn = document.getElementById('modal-delete-btn');
   const modalCandName = document.getElementById('modal-cand-name');
   const modalCandPos = document.getElementById('modal-cand-pos');
@@ -745,153 +746,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('#modal-ai-detector details').forEach(details => { details.open = true; });
   });
 
-  function buildPDFReport(report) {
-    const score = calculateTechnicalScore(report.technical_answers);
-
-    const pdfRoot = document.createElement('div');
-    pdfRoot.className = 'pdf-report bg-white';
-    pdfRoot.style.cssText = 'width:700px;margin:0 auto;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;color:#1f2937;';
-
-    const header = document.createElement('div');
-    header.className = 'bg-blue-400 p-6 text-white';
-    header.innerHTML = `
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-          <i class="fa-solid fa-id-card text-xl"></i>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold">${escapeHTML(report.candidate_name || 'Candidato')}</h1>
-          <p class="text-xs text-blue-100">Vacante de Interés: ${escapeHTML(report.assigned_exam_name || 'General')}</p>
-        </div>
-      </div>
-    `;
-    pdfRoot.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'p-6 space-y-6';
-
-    const scoreCard = document.createElement('div');
-    scoreCard.className = 'bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between pdf-avoid-break';
-    scoreCard.innerHTML = `
-      <div>
-        <span class="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block">Calificaciones</span>
-        <span class="text-lg font-bold text-gray-800">${score.total > 0 ? `${score.correct} bien, ${score.incorrect} mal, ${score.empty} vacías de ${score.total}` : 'Evaluación cualitativa'}</span>
-      </div>
-      <div class="text-xs font-extrabold bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full">${score.total > 0 ? `${score.scorePct}%` : '—'}</div>
-    `;
-    body.appendChild(scoreCard);
-
-    const info = report.candidate_info || {};
-    const infoKeys = Object.keys(info);
-    const infoCard = document.createElement('div');
-    infoCard.className = 'bg-gray-50 p-4 rounded-2xl border border-gray-100 pdf-avoid-break';
-    infoCard.innerHTML = `
-      <h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> Información del Candidato</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600">
-        ${infoKeys.length === 0
-          ? '<span class="text-gray-400 col-span-2">No se capturó información adicional de formulario.</span>'
-          : infoKeys.map(key => `
-              <div class="bg-white p-2 rounded-xl border border-blue-50 shadow-sm">
-                <strong class="text-[9px] text-blue-400 uppercase block">${escapeHTML(key.replace(/_/g, ' ').toUpperCase())}</strong>
-                <span class="text-xs font-semibold text-gray-700">${escapeHTML(String(info[key] ?? ''))}</span>
-              </div>
-            `).join('')}
-      </div>
-    `;
-    body.appendChild(infoCard);
-
-    const techSection = document.createElement('section');
-    techSection.className = 'pdf-section';
-    techSection.innerHTML = '<h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-laptop-code mr-1 text-blue-400"></i> Respuestas de los Exámenes</h2>';
-    const techContainer = document.createElement('div');
-    techContainer.className = 'space-y-3';
-    renderAnswers(techContainer, report.technical_answers);
-    techSection.appendChild(techContainer);
-    body.appendChild(techSection);
-
-    const psyParts = (report.psychometric_answers && report.psychometric_answers.parts) || [];
-    if (psyParts.length > 0) {
-      const psySection = document.createElement('section');
-      psySection.className = 'pdf-section';
-      psySection.innerHTML = '<h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-brain mr-1 text-blue-400"></i> Respuestas Psicométricas</h2>';
-      const psyContainer = document.createElement('div');
-      psyContainer.className = 'space-y-3';
-      renderAnswers(psyContainer, report.psychometric_answers);
-      psySection.appendChild(psyContainer);
-      body.appendChild(psySection);
-    }
-
-    const aiHtml = buildAIDetectorHtml(report);
-    if (aiHtml) {
-      const aiSection = document.createElement('section');
-      aiSection.className = 'pdf-section';
-      aiSection.innerHTML = '<h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-file-shield mr-1 text-violet-500"></i> Detector de IA</h2>';
-      const aiContainer = document.createElement('div');
-      aiContainer.className = 'space-y-2';
-      aiContainer.innerHTML = aiHtml;
-      aiSection.appendChild(aiContainer);
-      body.appendChild(aiSection);
-    }
-
-    pdfRoot.appendChild(body);
-
-    const pdfFooter = document.createElement('div');
-    pdfFooter.className = 'px-6 py-4 border-t border-gray-100 text-center text-[10px] text-gray-400';
-    pdfFooter.textContent = `Reporte generado el ${new Date().toLocaleString('es-MX')} · CircleCenter`;
-    pdfRoot.appendChild(pdfFooter);
-
-    pdfRoot.querySelectorAll('details').forEach(details => { details.open = true; });
-
-    const pdfStyle = document.createElement('style');
-    pdfStyle.textContent = `
-      .pdf-report [class*="max-h-"] { max-height: none !important; }
-      .pdf-report [class*="overflow-"] { overflow: visible !important; }
-      .pdf-report .pdf-avoid-break,
-      .pdf-report .pdf-question { break-inside: avoid; }
-    `;
-    pdfRoot.appendChild(pdfStyle);
-
-    return pdfRoot;
+  function getPublicReportUrl(report, print = false) {
+    const url = new URL('reporte_publico.html', window.location.href);
+    url.searchParams.set('id', report.id);
+    if (print) url.searchParams.set('print', '1');
+    return url.toString();
   }
 
-  modalPrintBtn.addEventListener('click', async () => {
+  if (modalShareBtn) {
+    modalShareBtn.addEventListener('click', async () => {
+      if (!activeReport) return;
+      const shareUrl = getPublicReportUrl(activeReport);
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        const original = modalShareBtn.innerHTML;
+        modalShareBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Enlace copiado';
+        setTimeout(() => { modalShareBtn.innerHTML = original; }, 2000);
+      } catch (err) {
+        window.prompt('Copia el enlace del reporte:', shareUrl);
+      }
+    });
+  }
+
+  modalPrintBtn.addEventListener('click', () => {
     if (!activeReport) return;
-    const originalHtml = modalPrintBtn.innerHTML;
-    modalPrintBtn.disabled = true;
-    modalPrintBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Generando PDF...';
-    let pdfWrapper = null;
-
-    try {
-      if (typeof html2pdf === 'undefined') throw new Error('html2pdf no está disponible');
-
-      const pdfRoot = buildPDFReport(activeReport);
-
-      pdfWrapper = document.createElement('div');
-      pdfWrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:700px;background:#ffffff;';
-      pdfWrapper.appendChild(pdfRoot);
-      document.body.appendChild(pdfWrapper);
-
-      const safeName = String(activeReport.candidate_name || 'candidato')
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/gi, '_')
-        .replace(/^_+|_+$/g, '') || 'candidato';
-
-      await html2pdf().set({
-        margin: [10, 10, 10, 10],
-        filename: `reporte_${safeName}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0, windowWidth: 700 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-      }).from(pdfRoot).save();
-    } catch (err) {
-      console.error(err);
-      window.print();
-    } finally {
-      if (pdfWrapper) pdfWrapper.remove();
-      modalPrintBtn.disabled = false;
-      modalPrintBtn.innerHTML = originalHtml;
-    }
+    window.open(getPublicReportUrl(activeReport, true), '_blank');
   });
 
   modalDeleteBtn.addEventListener('click', () => {

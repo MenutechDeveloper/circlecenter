@@ -161,31 +161,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { correct, total };
   }
 
-  function getChangedCorrectAnswers(oldExam, newParts) {
-    const oldByKey = new Map();
-    ((oldExam && oldExam.parts) || []).forEach(part => {
+  function getCorrectAnswerMap(parts) {
+    const map = new Map();
+    (parts || []).forEach(part => {
       (part.questions || []).forEach(q => {
         const key = resultQuestionKey(q);
-        if (key) oldByKey.set(key, q.correct);
+        if (key) map.set(key, q.correct);
       });
     });
-
-    const changed = new Map();
-    (newParts || []).forEach(part => {
-      (part.questions || []).forEach(q => {
-        const key = resultQuestionKey(q);
-        if (!key || !oldByKey.has(key)) return;
-        if (String(oldByKey.get(key) ?? '') !== String(q.correct ?? '')) {
-          changed.set(key, q.correct);
-        }
-      });
-    });
-    return changed;
+    return map;
   }
 
-  async function propagateCorrectAnswersToResults(oldExam, newParts) {
-    const changed = getChangedCorrectAnswers(oldExam, newParts);
-    if (changed.size === 0) return { updated: 0, failed: 0 };
+  async function syncCorrectAnswersToResults(correctByKey) {
+    if (!correctByKey || correctByKey.size === 0) return { updated: 0, failed: 0 };
 
     const pageSize = 1000;
     let from = 0;
@@ -212,8 +200,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         parts.forEach(part => {
           (part.questions || []).forEach(q => {
             const key = resultQuestionKey(q);
-            if (key && changed.has(key)) {
-              const newCorrect = changed.get(key);
+            if (key && correctByKey.has(key)) {
+              const newCorrect = correctByKey.get(key);
               if (String(q.correct ?? '') !== String(newCorrect ?? '')) {
                 q.correct = newCorrect;
                 touched = true;
@@ -259,6 +247,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     return { updated, failed };
+  }
+
+  async function syncExamCorrectAnswersToResults(parts) {
+    return syncCorrectAnswersToResults(getCorrectAnswerMap(parts));
   }
 
   function getQuestionText(q) {
@@ -488,6 +480,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
           </div>
           <div class="flex gap-2 shrink-0 justify-end">
+            ${!isPsy ? `
+              <button class="sync-exam-btn px-3 py-1.5 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-xl font-bold text-xs transition" data-id="${exam.id}">
+                <i class="fa-solid fa-rotate"></i> Sincronizar
+              </button>
+            ` : ''}
             <button class="edit-exam-btn px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl font-bold text-xs transition" data-id="${exam.id}">
               <i class="fa-solid fa-pencil"></i> Editar
             </button>
@@ -525,6 +522,29 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
           lastActivePartIdx = 0;
           goToStep(2);
+        }
+      });
+    });
+
+    document.querySelectorAll('.sync-exam-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const exam = allExams.find(e => e.id === id);
+        if (!exam) return;
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
+        try {
+          const result = await syncExamCorrectAnswersToResults(exam.parts || []);
+          showPastelAlert(result.updated > 0
+            ? `Se actualizaron ${result.updated} reportes con la clave actual del examen.`
+            : 'No había reportes pendientes de sincronizar.');
+        } catch (err) {
+          console.error(err);
+          showPastelAlert('No se pudieron sincronizar los reportes: ' + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = original;
         }
       });
     });
@@ -1412,12 +1432,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (existingExam) {
           try {
-            const propagation = await propagateCorrectAnswersToResults(existingExam, partsData);
-            if (propagation.failed > 0) {
-              console.warn(`Se actualizaron ${propagation.updated} resultados; ${propagation.failed} fallaron.`);
+            const sync = await syncExamCorrectAnswersToResults(partsData);
+            if (sync.failed > 0) {
+              console.warn(`Se sincronizaron ${sync.updated} resultados; ${sync.failed} fallaron.`);
             }
-          } catch (propagationError) {
-            console.error('No se pudieron propagar las respuestas correctas a los resultados:', propagationError);
+          } catch (syncError) {
+            console.error('No se pudieron sincronizar las respuestas correctas con los resultados:', syncError);
           }
         }
 
