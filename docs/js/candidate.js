@@ -51,6 +51,466 @@ document.addEventListener('DOMContentLoaded', async () => {
   // { [examId]: { [questionId]: answerValue } }
   let technicalAnswersByExam = {};
 
+  // ==========================================
+  // DETECTOR DE IA (solo exámenes con ai_detector activo)
+  // ==========================================
+  const AI_STORAGE_PREFIX = 'cc_ai_metrics_v1_';
+  let aiDetectorActiveExamId = null;
+  let aiMetricsByExam = {}; // { [examId]: metrics }
+  let aiTrackedQuestions = {}; // { [questionId]: tracking }
+  let aiObserver = null;
+  let aiTrackingInterval = null;
+  let aiUnloadCounted = false;
+  let aiExamFinished = false;
+  let aiLastCopyToastAt = 0;
+  let aiLastPasteToastAt = 0;
+
+  function aiStorageKey() {
+    return selectedCandidate ? `${AI_STORAGE_PREFIX}${selectedCandidate.id}` : null;
+  }
+
+  function loadAIMetricsFromStorage() {
+    aiMetricsByExam = {};
+    const key = aiStorageKey();
+    if (!key) return;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          aiMetricsByExam = parsed;
+          Object.keys(aiMetricsByExam).forEach(examId => {
+            const entry = aiMetricsByExam[examId];
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+              delete aiMetricsByExam[examId];
+            }
+          });
+        }
+      }
+    } catch (err) {
+      aiMetricsByExam = {};
+    }
+  }
+
+  function persistAIMetrics() {
+    const key = aiStorageKey();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(aiMetricsByExam));
+    } catch (err) {
+      // El almacenamiento puede estar lleno o deshabilitado; el seguimiento continúa en memoria.
+    }
+  }
+
+  function clearAIMetricsStorage() {
+    const key = aiStorageKey();
+    if (key) {
+      try { localStorage.removeItem(key); } catch (err) { /* noop */ }
+    }
+  }
+
+  function createEmptyAIMetrics() {
+    return {
+      tabSwitches: 0,
+      pageAbandons: 0,
+      copyCount: 0,
+      pasteAttempts: 0,
+      copiedQuestions: {},
+      questionTimes: {},
+      startedAt: Date.now(),
+      totalMs: 0,
+      lastAbandonAt: null
+    };
+  }
+
+  function getExamAIMetrics(examId) {
+    if (!aiMetricsByExam[examId]) {
+      aiMetricsByExam[examId] = createEmptyAIMetrics();
+    }
+    const metrics = aiMetricsByExam[examId];
+    ['tabSwitches', 'pageAbandons', 'copyCount', 'pasteAttempts', 'totalMs'].forEach(key => {
+      if (typeof metrics[key] !== 'number' || !isFinite(metrics[key])) metrics[key] = 0;
+    });
+    if (!metrics.copiedQuestions || typeof metrics.copiedQuestions !== 'object' || Array.isArray(metrics.copiedQuestions)) {
+      metrics.copiedQuestions = {};
+    }
+    if (!metrics.questionTimes || typeof metrics.questionTimes !== 'object' || Array.isArray(metrics.questionTimes)) {
+      metrics.questionTimes = {};
+    }
+    if (!metrics.startedAt || typeof metrics.startedAt !== 'number') metrics.startedAt = Date.now();
+    if (metrics.lastAbandonAt === undefined) metrics.lastAbandonAt = null;
+    return metrics;
+  }
+
+  function showAIToast(message, type = 'warning', duration = 4200) {
+    const container = document.getElementById('ai-toast-container');
+    if (!container) return;
+
+    const palette = type === 'danger'
+      ? 'bg-rose-50 border-rose-200 text-rose-700'
+      : type === 'success'
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+        : 'bg-amber-50 border-amber-200 text-amber-800';
+    const icon = type === 'danger'
+      ? 'fa-triangle-exclamation'
+      : type === 'success' ? 'fa-circle-check' : 'fa-shield-halved';
+
+    const toast = document.createElement('div');
+    toast.className = `pointer-events-auto flex items-start gap-2 px-4 py-3 rounded-2xl border shadow-lg text-xs font-bold transition-all duration-300 opacity-0 -translate-x-3 ${palette}`;
+    toast.innerHTML = `<i aria-hidden="true" class="fa-solid ${icon} mt-0.5"></i><span>${escapeHTML(message)}</span>`;
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.remove('opacity-0', '-translate-x-3'));
+    setTimeout(() => {
+      toast.classList.add('opacity-0', '-translate-x-3');
+      setTimeout(() => toast.remove(), 320);
+    }, duration);
+  }
+
+  function updateAIBadge() {
+    const badge = document.getElementById('ai-detector-badge');
+    const stats = document.getElementById('ai-live-stats');
+    if (!badge) return;
+
+    if (!aiDetectorActiveExamId) {
+      badge.classList.add('hidden');
+      return;
+    }
+
+    badge.classList.remove('hidden');
+    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+    const copiedCount = Object.keys(metrics.copiedQuestions || {}).length;
+    if (stats) {
+      stats.textContent = `· Pestañas: ${metrics.tabSwitches} · Copias: ${copiedCount} · Pegados: ${metrics.pasteAttempts}`;
+    }
+  }
+
+  function findQuestionWrapper(node) {
+    if (!node) return null;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    if (!(node instanceof Element)) return null;
+    return node.closest('.tech-question-block');
+  }
+
+  function getQuestionIdsFromSelection() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return [];
+    const range = selection.getRangeAt(0);
+    const ids = new Set();
+    document.querySelectorAll('.tech-question-block').forEach(block => {
+      try {
+        if (range.intersectsNode(block)) ids.add(block.getAttribute('data-q-id'));
+      } catch (err) { /* rango inválido */ }
+    });
+    return [...ids].filter(Boolean);
+  }
+
+  function markAIQuestionAnswered(questionId) {
+    if (!aiDetectorActiveExamId || !questionId) return;
+    const tracking = aiTrackedQuestions[questionId];
+    if (!tracking || tracking.answered) return;
+
+    tracking.answered = true;
+    tracking.answeredAt = Date.now();
+
+    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+    metrics.questionTimes[questionId] = {
+      visibleMs: tracking.visibleMs,
+      firstVisibleAt: tracking.firstVisibleAt,
+      answeredAt: tracking.answeredAt,
+      answered: true
+    };
+    persistAIMetrics();
+  }
+
+  function finalizeAIQuestionTracking() {
+    if (aiObserver) {
+      aiObserver.disconnect();
+      aiObserver = null;
+    }
+    if (aiTrackingInterval) {
+      clearInterval(aiTrackingInterval);
+      aiTrackingInterval = null;
+    }
+
+    if (aiDetectorActiveExamId) {
+      const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+      Object.keys(aiTrackedQuestions).forEach(questionId => {
+        const tracking = aiTrackedQuestions[questionId];
+        metrics.questionTimes[questionId] = {
+          visibleMs: tracking.visibleMs,
+          firstVisibleAt: tracking.firstVisibleAt,
+          answeredAt: tracking.answeredAt,
+          answered: tracking.answered
+        };
+      });
+    }
+    aiTrackedQuestions = {};
+  }
+
+  function initAIQuestionTracking(examId) {
+    finalizeAIQuestionTracking();
+
+    const metrics = getExamAIMetrics(examId);
+    if (!metrics.questionTimes) metrics.questionTimes = {};
+
+    const blocks = techQuestionsContainer.querySelectorAll('.tech-question-block');
+    if (blocks.length === 0) return;
+
+    blocks.forEach(block => {
+      const questionId = block.getAttribute('data-q-id');
+      const saved = metrics.questionTimes[questionId] || {};
+      aiTrackedQuestions[questionId] = {
+        el: block,
+        isVisible: false,
+        visibleMs: saved.visibleMs || 0,
+        // Las respuestas no se persisten al recargar: el tiempo de respuesta se reinicia.
+        firstVisibleAt: null,
+        answeredAt: null,
+        answered: false
+      };
+    });
+
+    if ('IntersectionObserver' in window) {
+      aiObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          const questionId = entry.target.getAttribute('data-q-id');
+          const tracking = aiTrackedQuestions[questionId];
+          if (!tracking) return;
+          tracking.isVisible = entry.isIntersecting;
+          if (entry.isIntersecting && !tracking.firstVisibleAt) {
+            tracking.firstVisibleAt = Date.now();
+          }
+        });
+      }, { root: techQuestionsContainer, threshold: 0 });
+      blocks.forEach(block => aiObserver.observe(block));
+    } else {
+      Object.values(aiTrackedQuestions).forEach(tracking => {
+        tracking.isVisible = true;
+        tracking.firstVisibleAt = tracking.firstVisibleAt || Date.now();
+      });
+    }
+
+    aiTrackingInterval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      Object.values(aiTrackedQuestions).forEach(tracking => {
+        if (tracking.isVisible) tracking.visibleMs += 1000;
+      });
+      persistAIMetrics();
+    }, 1000);
+
+    const currentAnswers = technicalAnswersByExam[examId] || {};
+    Object.keys(aiTrackedQuestions).forEach(questionId => {
+      const answer = currentAnswers[questionId];
+      if (answer !== undefined && answer !== '') markAIQuestionAnswered(questionId);
+    });
+  }
+
+  function startAIDetector(exam) {
+    if (!exam || !exam.id || exam.is_psychometric === true || exam.ai_detector !== true) {
+      stopAIDetector();
+      return;
+    }
+
+    if (aiDetectorActiveExamId === exam.id) {
+      updateAIBadge();
+      return;
+    }
+
+    stopAIDetector();
+
+    aiExamFinished = false;
+    aiUnloadCounted = false;
+    aiLastCopyToastAt = 0;
+    aiLastPasteToastAt = 0;
+    aiDetectorActiveExamId = exam.id;
+
+    const metrics = getExamAIMetrics(exam.id);
+    metrics.startedAt = Date.now();
+
+    initAIQuestionTracking(exam.id);
+    persistAIMetrics();
+    updateAIBadge();
+
+    if (metrics.tabSwitches || metrics.pageAbandons || metrics.copyCount || metrics.pasteAttempts) {
+      const copied = Object.keys(metrics.copiedQuestions || {}).length;
+      showAIToast(
+        `Detector de IA: se reanudó el seguimiento (pestañas: ${metrics.tabSwitches}, salidas: ${metrics.pageAbandons}, copias: ${copied}, pegados: ${metrics.pasteAttempts}).`,
+        'warning',
+        6500
+      );
+    } else {
+      showAIToast('Detector de IA activo: no podrás pegar texto en este examen y se registrarán los cambios de pestaña.', 'warning', 6000);
+    }
+  }
+
+  function stopAIDetector() {
+    if (!aiDetectorActiveExamId) return;
+    finalizeAIQuestionTracking();
+    persistAIMetrics();
+    aiDetectorActiveExamId = null;
+    const badge = document.getElementById('ai-detector-badge');
+    if (badge) badge.classList.add('hidden');
+  }
+
+  function finalizeCurrentExamAIMetrics() {
+    if (!aiDetectorActiveExamId) return;
+    finalizeAIQuestionTracking();
+    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+    metrics.totalMs = (metrics.totalMs || 0) + (Date.now() - (metrics.startedAt || Date.now()));
+    metrics.startedAt = Date.now();
+    persistAIMetrics();
+    updateAIBadge();
+  }
+
+  function buildAIDetectorSummary() {
+    const examEntries = [];
+
+    assignedTechnicalExamsList.forEach(exam => {
+      if (exam.is_psychometric === true || exam.ai_detector !== true) return;
+      const metrics = aiMetricsByExam[exam.id];
+      if (!metrics) return;
+
+      const questions = (exam.parts || []).filter(Boolean).flatMap(part => part.questions || []).filter(Boolean);
+      const questionById = {};
+      questions.forEach(question => { questionById[question.id] = question; });
+
+      const copiedQuestions = Object.keys(metrics.copiedQuestions || {})
+        .filter(questionId => questionById[questionId])
+        .map(questionId => {
+          const question = questionById[questionId];
+          return {
+            questionId,
+            questionText: question ? getQuestionText(question).slice(0, 160) : '',
+            count: metrics.copiedQuestions[questionId]
+          };
+        });
+
+      const questionTimes = questions.map((question, index) => {
+        const time = (metrics.questionTimes || {})[question.id] || {};
+        return {
+          questionId: question.id,
+          questionNumber: index + 1,
+          questionText: getQuestionText(question).slice(0, 140),
+          visibleMs: time.visibleMs || 0,
+          timeToAnswerMs: (time.firstVisibleAt && time.answeredAt)
+            ? Math.max(0, time.answeredAt - time.firstVisibleAt)
+            : null,
+          answered: !!time.answered
+        };
+      });
+
+      examEntries.push({
+        examId: exam.id,
+        examName: exam.name,
+        tabSwitches: metrics.tabSwitches || 0,
+        pageAbandons: metrics.pageAbandons || 0,
+        copyCount: metrics.copyCount || 0,
+        copiedQuestionCount: copiedQuestions.length,
+        copiedQuestions,
+        pasteAttempts: metrics.pasteAttempts || 0,
+        totalMs: metrics.totalMs || 0,
+        lastAbandonAt: metrics.lastAbandonAt || null,
+        questionTimes
+      });
+    });
+
+    return {
+      enabled: examEntries.length > 0,
+      generatedAt: new Date().toISOString(),
+      exams: examEntries
+    };
+  }
+
+  // Eventos globales del Detector de IA (solo actúan si hay un examen con detector activo)
+  document.addEventListener('visibilitychange', () => {
+    if (!aiDetectorActiveExamId) return;
+    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+
+    if (document.hidden) {
+      metrics.tabSwitches++;
+      persistAIMetrics();
+      updateAIBadge();
+    } else if (metrics.tabSwitches > 0) {
+      showAIToast(`Se registró un cambio de pestaña (${metrics.tabSwitches} en total).`, 'warning');
+    }
+  });
+
+  document.addEventListener('copy', (event) => {
+    if (!aiDetectorActiveExamId) return;
+
+    const targetEl = event.target;
+    const isEditableTarget = targetEl && (targetEl.tagName === 'INPUT' || targetEl.tagName === 'TEXTAREA' || targetEl.isContentEditable);
+    if (isEditableTarget) return;
+
+    const selectionIds = getQuestionIdsFromSelection();
+    const targetWrapper = findQuestionWrapper(event.target);
+    const targetId = targetWrapper ? targetWrapper.getAttribute('data-q-id') : null;
+
+    if (selectionIds.length === 0 && !targetId) return;
+
+    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+    metrics.copyCount++;
+
+    const idsToMark = selectionIds.length > 0 ? selectionIds : [targetId];
+    idsToMark.filter(Boolean).forEach(questionId => {
+      metrics.copiedQuestions[questionId] = (metrics.copiedQuestions[questionId] || 0) + 1;
+    });
+
+    persistAIMetrics();
+    updateAIBadge();
+    const now = Date.now();
+    if (now - aiLastCopyToastAt > 1800) {
+      aiLastCopyToastAt = now;
+      showAIToast('Se registró una copia del contenido del examen.', 'warning', 3200);
+    }
+  });
+
+  document.addEventListener('paste', (event) => {
+    if (!aiDetectorActiveExamId) return;
+
+    const target = event.target;
+    if (!target) return;
+
+    const isEditable = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+    if (!isEditable) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+    metrics.pasteAttempts++;
+    persistAIMetrics();
+    updateAIBadge();
+    const now = Date.now();
+    if (now - aiLastPasteToastAt > 1800) {
+      aiLastPasteToastAt = now;
+      showAIToast('No puedes pegar contenido por detector de IA', 'danger');
+    }
+  }, true);
+
+  function handleAIUnload() {
+    if (!aiDetectorActiveExamId || aiExamFinished || aiUnloadCounted) return;
+    aiUnloadCounted = true;
+
+    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+    metrics.pageAbandons++;
+    metrics.lastAbandonAt = new Date().toISOString();
+    metrics.totalMs = (metrics.totalMs || 0) + (Date.now() - (metrics.startedAt || Date.now()));
+    metrics.startedAt = Date.now();
+    persistAIMetrics();
+  }
+
+  window.addEventListener('beforeunload', handleAIUnload);
+  window.addEventListener('pagehide', handleAIUnload);
+  window.addEventListener('pageshow', () => {
+    aiUnloadCounted = false;
+    if (aiDetectorActiveExamId) {
+      const metrics = getExamAIMetrics(aiDetectorActiveExamId);
+      metrics.startedAt = Date.now();
+    }
+  });
+
   function showStep(stepElement) {
     [stepSelectCandidate, stepInfoForm, stepPsychometric, stepTechnical, stepCompleted].forEach(step => {
       step.classList.add('hidden');
@@ -79,13 +539,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         noCandidatesAlert.classList.add('hidden');
         activeCandidates.forEach(cand => {
-          let examsLabel = "Sin exámenes asignados";
-          if (cand.assigned_exams && Array.isArray(cand.assigned_exams) && cand.assigned_exams.length > 0) {
-            examsLabel = cand.assigned_exams.map((e, i) => `${i + 1}. ${e.name}`).join(' → ');
-          } else if (cand.assigned_exam_name) {
-            examsLabel = cand.assigned_exam_name;
-          }
-          selectCand.innerHTML += `<option value="${cand.id}">${cand.name} (${examsLabel})</option>`;
+          selectCand.innerHTML += `<option value="${cand.id}">${escapeHTML(cand.name)}</option>`;
         });
       }
     } catch (err) {
@@ -103,6 +557,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     selectedCandidate = activeCandidates.find(c => c.id === candId);
     if (!selectedCandidate) return;
+
+    loadAIMetricsFromStorage();
+    aiExamFinished = false;
+    aiUnloadCounted = false;
 
     currentCandidateDisplay.textContent = selectedCandidate.name;
     statusBar.classList.remove('hidden');
@@ -687,7 +1145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         partHtml += `
-          <div class="space-y-1">
+          <div class="space-y-1 tech-question-block" data-q-id="${q.id}">
             ${q.type === 'proyectos' ? '' : `<span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed whitespace-pre-wrap ${q.type === 'programacion' ? 'font-mono text-[13px]' : ''}" style="white-space: pre-wrap;">${escapeHTML(getQuestionText(q))}</span>`}
             ${widget}
           </div>
@@ -725,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       radio.addEventListener('change', () => {
         const qId = radio.getAttribute('data-q-id');
         currentAnswers[qId] = radio.value;
+        markAIQuestionAnswered(qId);
         const total = Object.keys(currentAnswers).length;
         updateProgress(techProgressText, total, qCount);
       });
@@ -736,6 +1195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const val = ta.value.trim();
         if (val) {
           currentAnswers[qId] = val;
+          markAIQuestionAnswered(qId);
         } else {
           delete currentAnswers[qId];
         }
@@ -750,6 +1210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const val = ta.value;
         if (val.trim()) {
           currentAnswers[qId] = val;
+          markAIQuestionAnswered(qId);
         } else {
           delete currentAnswers[qId];
         }
@@ -782,6 +1243,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         } else {
           delete currentAnswers[qId];
+        }
+        if (currentAnswers[qId] !== undefined) {
+          markAIQuestionAnswered(qId);
         }
         updateProgress(techProgressText, Object.keys(currentAnswers).length, qCount);
       };
@@ -838,6 +1302,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       updateRemoveButtons();
     });
+
+    if (exam.ai_detector === true) {
+      startAIDetector(exam);
+    } else {
+      stopAIDetector();
+    }
   }
 
   btnSubmitTech.addEventListener('click', () => {
@@ -868,6 +1338,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Si hay más exámenes técnicos en la lista, pasar al siguiente automáticamente
     if (currentTechnicalExamIndex < assignedTechnicalExamsList.length - 1) {
+      finalizeCurrentExamAIMetrics();
       currentTechnicalExamIndex++;
       renderTechnicalExam();
       techQuestionsContainer.scrollTop = 0;
@@ -875,6 +1346,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       showPastelConfirm("¿Estás seguro de enviar tus respuestas y finalizar todo el proceso?", (accepted) => {
         if (accepted) {
+          finalizeCurrentExamAIMetrics();
+          stopAIDetector();
           saveAndFinish();
         }
       }, "Finalizar Evaluación");
@@ -887,6 +1360,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   async function saveAndFinish() {
     try {
+      aiExamFinished = true;
       // Si el candidato hizo múltiples exámenes, guardaremos un registro consolidado de resultados
       // donde 'technical_answers' unifica las respuestas de todos los exámenes, y guardaremos el score acumulado.
       let consolidatedScore = 0;
@@ -957,22 +1431,37 @@ document.addEventListener('DOMContentLoaded', async () => {
       const candidateEmail = candidateInfoAnswers['email'] || "";
       const candidatePhone = candidateInfoAnswers['phone'] || "";
       const positionLabel = consolidatedExamNames.length > 0 ? consolidatedExamNames.join(', ') : "Evaluación General";
+      const aiDetectorSummary = buildAIDetectorSummary();
 
       // Guardar en results
-      const { error: insertError } = await supabaseClient
+      const resultPayload = {
+        candidate_name: selectedCandidate.name,
+        candidate_email: candidateEmail,
+        candidate_phone: candidatePhone,
+        candidate_info: candidateInfoAnswers,
+        position: positionLabel,
+        psychometric_answers: structuredPsychometric,
+        technical_answers: consolidatedTechnical,
+        assigned_exam_name: positionLabel,
+        score: consolidatedScore,
+        max_score: consolidatedMaxScore
+      };
+      if (aiDetectorSummary.enabled) {
+        resultPayload.ai_metrics = aiDetectorSummary;
+      }
+
+      let { error: insertError } = await supabaseClient
         .from('results')
-        .insert([{
-          candidate_name: selectedCandidate.name,
-          candidate_email: candidateEmail,
-          candidate_phone: candidatePhone,
-          candidate_info: candidateInfoAnswers,
-          position: positionLabel,
-          psychometric_answers: structuredPsychometric,
-          technical_answers: consolidatedTechnical,
-          assigned_exam_name: positionLabel,
-          score: consolidatedScore,
-          max_score: consolidatedMaxScore
-        }]);
+        .insert([resultPayload]);
+
+      // Compatibilidad: si la columna ai_metrics aún no existe, guardar el resultado sin las métricas.
+      if (insertError && (insertError.code === '42703' || insertError.code === 'PGRST204') && resultPayload.ai_metrics) {
+        console.warn("La columna results.ai_metrics no existe. Guardando el resultado sin métricas del Detector de IA.");
+        delete resultPayload.ai_metrics;
+        ({ error: insertError } = await supabaseClient
+          .from('results')
+          .insert([resultPayload]));
+      }
 
       if (insertError) throw insertError;
 
@@ -984,16 +1473,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (updateError) throw updateError;
 
+      clearAIMetricsStorage();
+      aiMetricsByExam = {};
+
       statusBar.classList.add('hidden');
       showStep(stepCompleted);
 
     } catch (err) {
+      aiExamFinished = false;
       console.error(err);
       showPastelAlert("Error al finalizar la evaluación: " + err.message);
     }
   }
 
   btnRestart.addEventListener('click', () => {
+    stopAIDetector();
+    clearAIMetricsStorage();
+    aiMetricsByExam = {};
+    aiExamFinished = false;
+    aiUnloadCounted = false;
     candInfoForm.reset();
     psyQuestionsContainer.innerHTML = "";
     techQuestionsContainer.innerHTML = "";
@@ -1259,6 +1757,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function saveCanvasToAnswers() {
       technicalAnswersByExam[examId][qId] = canvas.toDataURL('image/png');
+      markAIQuestionAnswered(qId);
       const total = Object.keys(technicalAnswersByExam[examId]).length;
       const qCount = assignedTechnicalExamsList[currentTechnicalExamIndex].parts.reduce((acc, p) => acc + p.questions.length, 0);
       updateProgress(techProgressText, total, qCount);

@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalCandScore = document.getElementById('modal-cand-score');
   const modalCandPercentage = document.getElementById('modal-cand-percentage');
   const modalCandInfoFields = document.getElementById('modal-cand-info-fields');
+  const modalAIDetector = document.getElementById('modal-ai-detector');
   const modalTabPsyBtn = document.getElementById('modal-tab-psy-btn');
   const modalTabTechBtn = document.getElementById('modal-tab-tech-btn');
   const modalAnswersPsy = document.getElementById('modal-answers-psy');
@@ -158,10 +159,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         else if (scorePercent < 80) badgeColor = "bg-amber-50 text-amber-700 border border-amber-100";
       }
 
+      const ai = res.ai_metrics;
+      const aiEnabled = !!(ai && ai.enabled && Array.isArray(ai.exams) && ai.exams.length > 0);
+      const aiFlagged = aiEnabled && (ai.exams || []).some(exam =>
+        (exam.tabSwitches || 0) > 0 || (exam.pageAbandons || 0) > 0 ||
+        (exam.copyCount || 0) > 0 || (exam.copiedQuestionCount || 0) > 0 || (exam.pasteAttempts || 0) > 0
+      );
+      const aiBadge = aiEnabled ? `
+        <span class="ml-1 inline-flex items-center gap-1 align-middle text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${aiFlagged ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}" title="${aiFlagged ? 'Actividad detectada por el Detector de IA' : 'Sin incidencias del Detector de IA'}">
+          <i class="fa-solid fa-shield-halved"></i>${aiFlagged ? 'IA' : 'OK'}
+        </span>
+      ` : '';
+
       resultsTableBody.innerHTML += `
         <tr class="hover:bg-blue-50/20 transition">
           <td class="py-4 px-4 font-bold text-gray-800">
-            ${res.candidate_name}
+            ${res.candidate_name}${aiBadge}
           </td>
           <td class="py-4 px-4 text-xs">
             <div class="text-gray-700">${res.candidate_email || 'N/A'}</div>
@@ -239,6 +252,154 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function formatDuration(ms) {
+    const totalSeconds = Math.max(0, Math.round((ms || 0) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  }
+
+  function formatDateTime(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return '';
+    try {
+      return date.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+    } catch (e) {
+      return date.toLocaleString();
+    }
+  }
+
+  function renderAIDetector(report) {
+    if (!modalAIDetector) return;
+
+    const ai = report.ai_metrics;
+    const exams = ai && Array.isArray(ai.exams) ? ai.exams.filter(Boolean) : [];
+
+    if (!ai || !ai.enabled || exams.length === 0) {
+      modalAIDetector.classList.add('hidden');
+      modalAIDetector.innerHTML = '';
+      return;
+    }
+
+    const totals = exams.reduce((acc, exam) => ({
+      tabSwitches: acc.tabSwitches + (exam.tabSwitches || 0),
+      pageAbandons: acc.pageAbandons + (exam.pageAbandons || 0),
+      copyCount: acc.copyCount + (exam.copyCount || 0),
+      copiedQuestionCount: acc.copiedQuestionCount + (exam.copiedQuestionCount || 0),
+      pasteAttempts: acc.pasteAttempts + (exam.pasteAttempts || 0)
+    }), { tabSwitches: 0, pageAbandons: 0, copyCount: 0, copiedQuestionCount: 0, pasteAttempts: 0 });
+
+    const suspicious = totals.tabSwitches > 0 || totals.pageAbandons > 0 ||
+      totals.copyCount > 0 || totals.copiedQuestionCount > 0 || totals.pasteAttempts > 0;
+
+    const statCard = (label, value, icon) => `
+      <div class="bg-white rounded-xl border border-rose-100 p-2.5 text-center">
+        <i class="fa-solid ${icon} text-rose-400 text-xs"></i>
+        <span class="block text-lg font-extrabold text-gray-800 leading-tight">${value}</span>
+        <span class="block text-[9px] font-bold text-gray-400 uppercase leading-tight">${label}</span>
+      </div>
+    `;
+
+    let html = `
+      <div class="bg-rose-50/60 p-4 rounded-2xl border border-rose-100 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <h4 class="text-xs font-bold text-rose-700"><i class="fa-solid fa-shield-halved mr-1"></i> Detector de IA</h4>
+          <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full ${suspicious ? 'bg-rose-200 text-rose-800' : 'bg-emerald-200 text-emerald-800'}">
+            ${suspicious ? 'Actividad detectada' : 'Sin incidencias'}
+          </span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          ${statCard('Cambios de pestaña', totals.tabSwitches, 'fa-window-restore')}
+          ${statCard('Salidas del examen', totals.pageAbandons, 'fa-door-open')}
+          ${statCard('Preguntas copiadas', totals.copiedQuestionCount, 'fa-copy')}
+          ${statCard('Intentos de pegar', totals.pasteAttempts, 'fa-paste')}
+        </div>
+        <p class="text-[10px] text-gray-600 leading-relaxed">
+          ${suspicious
+            ? `Se registraron ${totals.tabSwitches} cambio(s) de pestaña, ${totals.pageAbandons} salida(s) del examen, ${totals.copiedQuestionCount} pregunta(s) copiada(s) y ${totals.pasteAttempts} intento(s) de pegar.`
+            : 'No se registraron cambios de pestaña, salidas, copias ni intentos de pegar.'}
+        </p>
+    `;
+
+    exams.forEach(exam => {
+      const copiedQuestions = Array.isArray(exam.copiedQuestions) ? exam.copiedQuestions.filter(Boolean) : [];
+      const questionTimes = Array.isArray(exam.questionTimes) ? exam.questionTimes.filter(Boolean) : [];
+
+      html += `
+        <div class="bg-white rounded-xl border border-rose-100 p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <h5 class="text-[11px] font-bold text-gray-800"><i class="fa-solid fa-file-shield text-rose-400 mr-1"></i> ${escapeHTML(exam.examName || 'Examen')}</h5>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[9px] font-bold text-gray-400">Tiempo total: ${formatDuration(exam.totalMs)}</span>
+              ${exam.lastAbandonAt && formatDateTime(exam.lastAbandonAt) ? `<span class="text-[9px] font-bold text-rose-500"><i class="fa-solid fa-door-open mr-1"></i>Última salida: ${escapeHTML(formatDateTime(exam.lastAbandonAt))}</span>` : ''}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+            <div class="bg-gray-50 rounded-lg p-2">
+              <span class="block text-gray-400 font-bold uppercase text-[8px]">Pestañas</span>
+              <span class="font-extrabold text-gray-700">${exam.tabSwitches || 0}</span>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-2">
+              <span class="block text-gray-400 font-bold uppercase text-[8px]">Salidas</span>
+              <span class="font-extrabold text-gray-700">${exam.pageAbandons || 0}</span>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-2">
+              <span class="block text-gray-400 font-bold uppercase text-[8px]">Copias</span>
+              <span class="font-extrabold text-gray-700">${exam.copyCount || 0}</span>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-2">
+              <span class="block text-gray-400 font-bold uppercase text-[8px]">Pegados bloqueados</span>
+              <span class="font-extrabold text-gray-700">${exam.pasteAttempts || 0}</span>
+            </div>
+          </div>
+
+          ${copiedQuestions.length > 0 ? `
+            <div class="bg-amber-50 rounded-lg p-2 text-[10px] text-amber-800">
+              <span class="font-bold">Preguntas copiadas (${copiedQuestions.length}):</span>
+              <ul class="list-disc pl-4 mt-1 space-y-0.5">
+                ${copiedQuestions.map(item => `<li>${escapeHTML((item.questionText || 'Pregunta').slice(0, 100))} <span class="text-amber-500">(${item.count || 1}x)</span></li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          ${questionTimes.length > 0 ? `
+            <details class="text-[10px]">
+              <summary class="cursor-pointer font-bold text-blue-600 select-none">Ver tiempo por pregunta</summary>
+              <div class="mt-2 overflow-x-auto custom-scroll">
+                <table class="w-full text-left">
+                  <thead>
+                    <tr class="text-gray-400 border-b border-blue-50">
+                      <th class="py-1 pr-2 font-bold">#</th>
+                      <th class="py-1 pr-2 font-bold">Pregunta</th>
+                      <th class="py-1 pr-2 font-bold whitespace-nowrap">En pantalla</th>
+                      <th class="py-1 font-bold whitespace-nowrap">Hasta responder</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${questionTimes.map(item => `
+                      <tr class="border-b border-blue-50/60 align-top">
+                        <td class="py-1 pr-2 text-gray-400 font-bold">${item.questionNumber}</td>
+                        <td class="py-1 pr-2 text-gray-600">${escapeHTML((item.questionText || '').slice(0, 80))}</td>
+                        <td class="py-1 pr-2 text-gray-700 whitespace-nowrap">${formatDuration(item.visibleMs)}</td>
+                        <td class="py-1 text-gray-700 whitespace-nowrap">${item.timeToAnswerMs !== null && item.timeToAnswerMs !== undefined ? formatDuration(item.timeToAnswerMs) : '<span class="text-gray-400">Sin responder</span>'}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          ` : ''}
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+    modalAIDetector.innerHTML = html;
+    modalAIDetector.classList.remove('hidden');
+  }
+
   function showReportModal(report) {
     activeReport = report;
     modalCandName.textContent = report.candidate_name;
@@ -298,6 +459,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       modalCandScore.textContent = "Evaluación cualitativa";
       modalCandPercentage.textContent = "—";
     }
+
+    // Métricas del Detector de IA (si aplica)
+    renderAIDetector(report);
 
     // Formulario de Registro Dinámico render
     modalCandInfoFields.innerHTML = "";
@@ -613,6 +777,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
     modalAnswersTech.classList.remove('hidden');
     modalAnswersPsy.classList.add('hidden');
+  });
+
+  window.addEventListener('beforeprint', () => {
+    document.querySelectorAll('#modal-ai-detector details').forEach(details => { details.open = true; });
   });
 
   modalPrintBtn.addEventListener('click', () => {

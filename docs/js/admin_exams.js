@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const examInfoForm = document.getElementById('exam-info-form');
   const examNameInput = document.getElementById('exam-name-input');
   const examDescInput = document.getElementById('exam-desc-input');
+  const examAIDetectorInput = document.getElementById('exam-ai-detector-input');
+  const aiDetectorLabel = document.getElementById('ai-detector-label');
+  const aiDetectorDbWarning = document.getElementById('ai-detector-db-warning');
 
   const examsList = document.getElementById('exams-list');
   const partsContainer = document.getElementById('parts-container');
@@ -36,6 +39,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentExamId = null; // null si es nuevo examen
   let partsData = []; // [{ id, title, questions: [] }]
   let lastActivePartIdx = 0; // Índice de la sección activa para añadir modos especiales
+  let aiDetectorColumnAvailable = null;
+
+  async function checkAIDetectorColumn() {
+    if (aiDetectorColumnAvailable !== null) return aiDetectorColumnAvailable;
+    try {
+      const { error } = await supabaseClient
+        .from('exams')
+        .select('ai_detector')
+        .limit(1);
+      aiDetectorColumnAvailable = !error;
+    } catch (err) {
+      aiDetectorColumnAvailable = false;
+    }
+    return aiDetectorColumnAvailable;
+  }
 
   function escapeHTML(str) {
     if (!str) return '';
@@ -267,6 +285,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadExams() {
     if (!supabaseClient) return;
     try {
+      await checkAIDetectorColumn();
+      if (examAIDetectorInput) {
+        examAIDetectorInput.disabled = aiDetectorColumnAvailable === false;
+      }
+      if (aiDetectorDbWarning) {
+        aiDetectorDbWarning.classList.toggle('hidden', aiDetectorColumnAvailable !== false);
+      }
       const { data, error } = await supabaseClient
         .from('exams')
         .select('*')
@@ -301,6 +326,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           <i class="fa-solid fa-star text-amber-500"></i> Obligatorio
         </span>
       ` : '';
+      const aiBadgeHtml = !isPsy && aiDetectorColumnAvailable && exam.ai_detector === true ? `
+        <span class="bg-rose-100 text-rose-700 text-[9px] font-extrabold px-2.5 py-1 rounded-full border border-rose-200 shadow-sm flex items-center gap-1 shrink-0" title="Cuenta cambios de pestaña, salidas, copias, intentos de pegar y tiempo por pregunta.">
+          <i class="fa-solid fa-shield-halved text-rose-500"></i> Detector de IA
+        </span>
+      ` : '';
+      const aiCheckboxHtml = (isPsy || aiDetectorColumnAvailable === false) ? '' : `
+        <label class="inline-flex items-center gap-2 cursor-pointer pt-1">
+          <input type="checkbox" class="toggle-ai-detector-chk rounded text-rose-500 border-rose-200 focus:ring-rose-400 w-4 h-4 transition" data-id="${exam.id}" ${exam.ai_detector === true ? 'checked' : ''}>
+          <span class="text-[11px] font-bold text-rose-600 hover:text-rose-700 transition">Detector de IA</span>
+        </label>
+      `;
 
       examsList.innerHTML += `
         <div class="p-5 bg-white hover:bg-blue-50/20 rounded-3xl border border-blue-100/50 flex flex-col md:flex-row md:items-center justify-between transition gap-4 shadow-sm ${isPsy ? 'ring-2 ring-amber-200 bg-amber-50/5 border-amber-200' : ''}">
@@ -308,14 +344,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex items-center gap-2 flex-wrap">
               <h3 class="font-bold text-gray-800 text-sm truncate">${exam.name}</h3>
               ${badgeHtml}
+              ${aiBadgeHtml}
             </div>
             <p class="text-xs text-gray-400 truncate">${exam.description || "Sin descripción"}</p>
 
-            <!-- Checkbox de Obligatoriedad -->
-            <label class="inline-flex items-center gap-2 cursor-pointer pt-1">
-              <input type="checkbox" class="toggle-psychometric-chk rounded text-amber-500 border-amber-200 focus:ring-amber-400 w-4 h-4 transition" data-id="${exam.id}" ${checkedAttr}>
-              <span class="text-[11px] font-bold text-amber-700 hover:text-amber-800 transition">Establecer como Obligatorio</span>
-            </label>
+            <!-- Configuraciones del examen -->
+            <div class="flex flex-wrap items-center gap-4 pt-1">
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" class="toggle-psychometric-chk rounded text-amber-500 border-amber-200 focus:ring-amber-400 w-4 h-4 transition" data-id="${exam.id}" ${checkedAttr}>
+                <span class="text-[11px] font-bold text-amber-700 hover:text-amber-800 transition">Establecer como Obligatorio</span>
+              </label>
+              ${aiCheckboxHtml}
+            </div>
           </div>
           <div class="flex gap-2 shrink-0 justify-end">
             <button class="edit-exam-btn px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl font-bold text-xs transition" data-id="${exam.id}">
@@ -338,6 +378,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           currentExamId = exam.id;
           examNameInput.value = exam.name;
           examDescInput.value = exam.description || "";
+          if (examAIDetectorInput) {
+            const isPsy = exam.is_psychometric === true;
+            examAIDetectorInput.checked = isPsy ? false : exam.ai_detector === true;
+            examAIDetectorInput.disabled = isPsy || aiDetectorColumnAvailable === false;
+            if (aiDetectorLabel) aiDetectorLabel.classList.toggle('hidden', isPsy);
+            if (aiDetectorDbWarning) aiDetectorDbWarning.classList.toggle('hidden', isPsy || aiDetectorColumnAvailable !== false);
+          }
           partsData = (exam.parts || []).map(p => ({
             ...p,
             title: p.title || "",
@@ -408,6 +455,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
+
+    // Toggle Detector de IA (por examen)
+    document.querySelectorAll('.toggle-ai-detector-chk').forEach(chk => {
+      chk.addEventListener('change', async () => {
+        const examId = chk.getAttribute('data-id');
+        const enabled = chk.checked;
+
+        if (aiDetectorColumnAvailable === false) {
+          chk.checked = !enabled;
+          showPastelAlert("Para usar el Detector de IA, ejecuta el archivo supabase_schema.sql en el editor SQL de Supabase. Agrega la columna ai_detector a exams y ai_metrics a results.", "Falta actualizar la base de datos");
+          return;
+        }
+
+        try {
+          const { error } = await supabaseClient
+            .from('exams')
+            .update({ ai_detector: enabled })
+            .eq('id', examId);
+
+          if (error) throw error;
+
+          showPastelAlert(
+            enabled
+              ? "El Detector de IA quedó activado solo para este examen. Los candidatos no podrán pegar texto en él y se registrarán sus métricas en el reporte."
+              : "El Detector de IA quedó desactivado para este examen.",
+            "Configuración Guardada"
+          );
+
+          await loadExams();
+        } catch (err) {
+          console.error(err);
+          if (err.code === '42703' || err.code === 'PGRST204') {
+            aiDetectorColumnAvailable = false;
+            showPastelAlert("La columna ai_detector no existe todavía. Ejecuta supabase_schema.sql en el editor SQL de Supabase (columnas ai_detector en exams y ai_metrics en results) y vuelve a intentarlo.", "Falta actualizar la base de datos");
+          } else {
+            showPastelAlert("Error al actualizar el Detector de IA: " + err.message);
+          }
+          chk.checked = !enabled;
+        }
+      });
+    });
   }
 
   // Eliminar Examen
@@ -432,6 +520,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentExamId = null;
     examNameInput.value = "";
     examDescInput.value = "";
+    if (examAIDetectorInput) {
+      examAIDetectorInput.checked = false;
+      examAIDetectorInput.disabled = aiDetectorColumnAvailable === false;
+    }
+    if (aiDetectorLabel) aiDetectorLabel.classList.remove('hidden');
+    if (aiDetectorDbWarning) aiDetectorDbWarning.classList.toggle('hidden', aiDetectorColumnAvailable !== false);
     partsData = [{
       id: "part_" + Date.now(),
       title: "",
@@ -1161,24 +1255,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         is_psychometric: existingExam ? existingExam.is_psychometric === true : false,
         parts: partsData
       };
+      if (aiDetectorColumnAvailable !== false) {
+        payload.ai_detector = examAIDetectorInput ? examAIDetectorInput.checked : false;
+      }
 
+      let aiDetectorDropped = false;
       if (currentExamId) {
         // UPDATE
-        const { error } = await supabaseClient
+        let { error } = await supabaseClient
           .from('exams')
           .update(payload)
           .eq('id', currentExamId);
 
+        if (error && (error.code === '42703' || error.code === 'PGRST204') && payload.ai_detector !== undefined) {
+          delete payload.ai_detector;
+          aiDetectorColumnAvailable = false;
+          aiDetectorDropped = true;
+          ({ error } = await supabaseClient
+            .from('exams')
+            .update(payload)
+            .eq('id', currentExamId));
+        }
+
         if (error) throw error;
-        showAlert("¡Examen técnico actualizado correctamente!");
+        showAlert(aiDetectorDropped ? "Examen actualizado, pero el Detector de IA no se guardó porque falta la columna ai_detector. Ejecuta supabase_schema.sql." : "¡Examen técnico actualizado correctamente!");
       } else {
         // INSERT
-        const { error } = await supabaseClient
+        let { error } = await supabaseClient
           .from('exams')
           .insert([payload]);
 
+        if (error && (error.code === '42703' || error.code === 'PGRST204') && payload.ai_detector !== undefined) {
+          delete payload.ai_detector;
+          aiDetectorColumnAvailable = false;
+          aiDetectorDropped = true;
+          ({ error } = await supabaseClient
+            .from('exams')
+            .insert([payload]));
+        }
+
         if (error) throw error;
-        showAlert("¡Examen guardado correctamente!");
+        showAlert(aiDetectorDropped ? "Examen guardado, pero el Detector de IA no se guardó porque falta la columna ai_detector. Ejecuta supabase_schema.sql." : "¡Examen guardado correctamente!");
       }
 
       goToStep(1);

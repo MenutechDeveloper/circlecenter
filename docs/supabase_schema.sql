@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS exams (
   name TEXT NOT NULL,
   description TEXT,
   is_psychometric BOOLEAN DEFAULT false,
+  ai_detector BOOLEAN DEFAULT false, -- Activa el Detector de IA solo para este examen
   parts JSONB DEFAULT '[]'::jsonb, -- Estructura de secciones y preguntas
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -29,6 +30,9 @@ ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assigned_exams JSONB DEFAULT '[]
 ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assigned_exam_id UUID;
 ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assigned_exam_name TEXT;
 
+-- Migración: Detector de IA por examen.
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS ai_detector BOOLEAN DEFAULT false;
+
 -- 3. Tabla de Resultados de Exámenes y Perfiles Guardados
 CREATE TABLE IF NOT EXISTS results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -42,8 +46,12 @@ CREATE TABLE IF NOT EXISTS results (
   assigned_exam_name TEXT,
   score NUMERIC DEFAULT 0, -- Puntaje obtenido en examen técnico
   max_score NUMERIC DEFAULT 0, -- Puntaje máximo posible en examen técnico
+  ai_metrics JSONB DEFAULT '{}'::jsonb, -- Métricas del Detector de IA (pestañas, copias, tiempos, etc.)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Migración: métricas del Detector de IA en resultados existentes.
+ALTER TABLE results ADD COLUMN IF NOT EXISTS ai_metrics JSONB DEFAULT '{}'::jsonb;
 
 -- 4. Tabla para el Formulario de Registro Dinámico de Candidatos (CRUD por RH)
 CREATE TABLE IF NOT EXISTS registration_forms (
