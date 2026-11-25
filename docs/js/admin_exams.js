@@ -125,6 +125,142 @@ document.addEventListener('DOMContentLoaded', async () => {
     return q;
   }
 
+
+  function resultQuestionKey(q) {
+    if (!q) return '';
+    return q.id ? `id:${q.id}` : `text:${String(q.text || '').trim()}`;
+  }
+
+  function calculateResultScore(technicalAnswers) {
+    const parts = (technicalAnswers && technicalAnswers.parts) || [];
+    let correct = 0;
+    let total = 0;
+    parts.forEach(part => {
+      (part.questions || []).forEach(q => {
+        if (!q) return;
+        const isGradable = q.type === 'multiple' || q.type === 'boolean' || q.type === 'programacion';
+        if (!isGradable) return;
+        total++;
+        let isCorrect = false;
+        if (q.type === 'programacion') {
+          const ansObj = typeof q.userAnswer === 'object' && q.userAnswer !== null ? q.userAnswer : null;
+          if (ansObj) {
+            const expected = String(q.correct || '').trim();
+            isCorrect = [ansObj.compiledOutput, ansObj.sql, ansObj.js, ansObj.html, ansObj.css]
+              .some(value => value && String(value).trim() === expected)
+              || String(q.userAnswer) === String(q.correct);
+          } else {
+            isCorrect = String(q.userAnswer ?? '').trim() === String(q.correct || '').trim();
+          }
+        } else {
+          isCorrect = q.userAnswer === q.correct;
+        }
+        if (isCorrect) correct++;
+      });
+    });
+    return { correct, total };
+  }
+
+  function getChangedCorrectAnswers(oldExam, newParts) {
+    const oldByKey = new Map();
+    ((oldExam && oldExam.parts) || []).forEach(part => {
+      (part.questions || []).forEach(q => {
+        const key = resultQuestionKey(q);
+        if (key) oldByKey.set(key, q.correct);
+      });
+    });
+
+    const changed = new Map();
+    (newParts || []).forEach(part => {
+      (part.questions || []).forEach(q => {
+        const key = resultQuestionKey(q);
+        if (!key || !oldByKey.has(key)) return;
+        if (String(oldByKey.get(key) ?? '') !== String(q.correct ?? '')) {
+          changed.set(key, q.correct);
+        }
+      });
+    });
+    return changed;
+  }
+
+  async function propagateCorrectAnswersToResults(oldExam, newParts) {
+    const changed = getChangedCorrectAnswers(oldExam, newParts);
+    if (changed.size === 0) return { updated: 0, failed: 0 };
+
+    const pageSize = 1000;
+    let from = 0;
+    let updated = 0;
+    let failed = 0;
+
+    while (true) {
+      const { data, error } = await supabaseClient
+        .from('results')
+        .select('id, technical_answers')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+
+      const rows = data || [];
+      if (rows.length === 0) break;
+
+      const updates = [];
+      rows.forEach(row => {
+        const tech = row.technical_answers;
+        const parts = tech && Array.isArray(tech.parts) ? tech.parts : [];
+        let touched = false;
+        parts.forEach(part => {
+          (part.questions || []).forEach(q => {
+            const key = resultQuestionKey(q);
+            if (key && changed.has(key)) {
+              const newCorrect = changed.get(key);
+              if (String(q.correct ?? '') !== String(newCorrect ?? '')) {
+                q.correct = newCorrect;
+                touched = true;
+              }
+            }
+          });
+        });
+        if (touched) {
+          const score = calculateResultScore(tech);
+          updates.push({
+            id: row.id,
+            technical_answers: tech,
+            score: score.correct,
+            max_score: score.total
+          });
+        }
+      });
+
+      for (let i = 0; i < updates.length; i += 20) {
+        const chunk = updates.slice(i, i + 20);
+        const results = await Promise.all(chunk.map(update =>
+          supabaseClient
+            .from('results')
+            .update({
+              technical_answers: update.technical_answers,
+              score: update.score,
+              max_score: update.max_score
+            })
+            .eq('id', update.id)
+        ));
+        results.forEach(({ error: updateError }) => {
+          if (updateError) {
+            failed++;
+            console.error('No se pudo actualizar el resultado:', updateError);
+          } else {
+            updated++;
+          }
+        });
+      }
+
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return { updated, failed };
+  }
+
   function getQuestionText(q) {
     if (!q) return '';
     if (q.type === 'programacion' && q.questionCode && String(q.questionCode).trim()) {
@@ -1241,6 +1377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
+    btnSaveExam.disabled = true;
     try {
       const existingExam = currentExamId ? allExams.find(e => e.id === currentExamId) : null;
       const payload = {
@@ -1272,6 +1409,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (error) throw error;
+
+        if (existingExam) {
+          try {
+            const propagation = await propagateCorrectAnswersToResults(existingExam, partsData);
+            if (propagation.failed > 0) {
+              console.warn(`Se actualizaron ${propagation.updated} resultados; ${propagation.failed} fallaron.`);
+            }
+          } catch (propagationError) {
+            console.error('No se pudieron propagar las respuestas correctas a los resultados:', propagationError);
+          }
+        }
+
         showAlert(aiDetectorDropped ? "Examen actualizado, pero el Detector de IA no se guardó porque falta la columna ai_detector. Ejecuta supabase_schema.sql." : "¡Examen técnico actualizado correctamente!");
       } else {
         // INSERT
@@ -1297,6 +1446,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       console.error(err);
       showAlert("Error al guardar examen: " + err.message, true);
+    } finally {
+      btnSaveExam.disabled = false;
     }
   });
 
