@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS candidates (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Migración para bases de datos existentes: habilita la asignación de varios exámenes en secuencia.
+ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assigned_exams JSONB DEFAULT '[]'::jsonb;
+-- Columnas de compatibilidad para el modo de un solo examen.
+ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assigned_exam_id UUID;
+ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assigned_exam_name TEXT;
+
 -- 3. Tabla de Resultados de Exámenes y Perfiles Guardados
 CREATE TABLE IF NOT EXISTS results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

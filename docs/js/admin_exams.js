@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnBackTo2 = document.getElementById('btn-back-to-2');
   const btnSaveExam = document.getElementById('btn-save-exam');
   const btnAddPart = document.getElementById('btn-add-part');
+  const sectionsToggle = document.getElementById('toggle-sections');
 
   const examInfoForm = document.getElementById('exam-info-form');
   const examNameInput = document.getElementById('exam-name-input');
@@ -52,6 +53,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
     if (/^[\w-]+(\.[\w-]+)+([\/?#].*)?$/.test(trimmed)) return 'https://' + trimmed;
     return '';
+  }
+
+  function normalizeSimProjectAnswer(raw) {
+    const value = raw && typeof raw === 'object' ? raw : {};
+    let projects = [];
+    if (Array.isArray(value.projects)) {
+      projects = value.projects;
+    } else if (value.description || value.link || value.technologies) {
+      projects = [value];
+    }
+    const hasProject = value.hasProject === true || value.hasProject === false ? value.hasProject : null;
+    return {
+      hasProject,
+      projects: projects.length > 0 ? projects : [{ description: '', link: '', technologies: '' }]
+    };
+  }
+
+  function simProjectRowHtml(qId, project = {}) {
+    return `
+      <div class="sim-proj-row grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
+        <textarea rows="1" class="sim-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none resize-y text-black" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
+        <input type="url" class="sim-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
+        <input type="text" class="sim-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
+        <button type="button" class="sim-proj-remove md:col-span-1 w-9 h-[38px] rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center justify-self-end md:justify-self-auto transition" title="Quitar proyecto">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+    `;
   }
 
   function beautifyCode(code) {
@@ -333,7 +362,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           currentExamId = exam.id;
           examNameInput.value = exam.name;
           examDescInput.value = exam.description || "";
-          partsData = exam.parts || [];
+          partsData = (exam.parts || []).map(p => ({
+            ...p,
+            title: p.title || "",
+            questions: p.questions || []
+          }));
+          if (partsData.length === 0) {
+            partsData = [{ id: "part_" + Date.now(), title: "", questions: [] }];
+          }
+          lastActivePartIdx = 0;
           goToStep(2);
         }
       });
@@ -421,9 +458,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     examDescInput.value = "";
     partsData = [{
       id: "part_" + Date.now(),
-      title: "Sección 1",
+      title: "",
       questions: []
     }];
+    lastActivePartIdx = 0;
     goToStep(2);
   });
 
@@ -440,30 +478,83 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   // DISEÑO DE SECCIONES Y PREGUNTAS (PASO 3)
   // ==========================================
+  function isSectionsMode() {
+    if (partsData.length === 0) return false;
+    return partsData.length > 1 || String(partsData[0].title || '').trim() !== '';
+  }
+
+  function ensureParts() {
+    if (partsData.length === 0) {
+      partsData = [{ id: "part_" + Date.now(), title: "", questions: [] }];
+      lastActivePartIdx = 0;
+    }
+  }
+
+  function enableSections() {
+    ensureParts();
+    partsData.forEach((part, idx) => {
+      if (!String(part.title || '').trim()) part.title = `Sección ${idx + 1}`;
+    });
+    lastActivePartIdx = 0;
+    renderParts();
+  }
+
+  function disableSections() {
+    const flatten = () => {
+      const questions = partsData.flatMap(p => p.questions || []);
+      partsData = [{ id: "part_" + Date.now(), title: "", questions }];
+      lastActivePartIdx = 0;
+      renderParts();
+    };
+    if (partsData.length > 1) {
+      showPastelConfirm("Al quitar las secciones, todas las preguntas se unirán en una sola lista. ¿Deseas continuar?", (accepted) => {
+        if (accepted) {
+          flatten();
+        } else if (sectionsToggle) {
+          sectionsToggle.checked = true;
+        }
+      }, "Quitar secciones");
+    } else {
+      flatten();
+    }
+  }
+
+  if (sectionsToggle) {
+    sectionsToggle.addEventListener('change', () => {
+      if (sectionsToggle.checked) {
+        enableSections();
+      } else {
+        disableSections();
+      }
+    });
+  }
+
   btnAddPart.addEventListener('click', () => {
+    ensureParts();
+    if (!isSectionsMode()) {
+      partsData[0].title = "Sección 1";
+    }
     partsData.push({
       id: "part_" + Date.now(),
       title: `Sección ${partsData.length + 1}`,
       questions: []
     });
+    lastActivePartIdx = partsData.length - 1;
     renderParts();
   });
 
   function renderParts() {
+    ensureParts();
+    const sectionsMode = isSectionsMode();
+    if (!sectionsMode) lastActivePartIdx = 0;
+    if (sectionsToggle) sectionsToggle.checked = sectionsMode;
+    if (btnAddPart) btnAddPart.classList.toggle('hidden', !sectionsMode);
+
     partsContainer.innerHTML = "";
-    if (partsData.length === 0) {
-      partsContainer.innerHTML = `
-        <div class="text-center py-6 text-gray-400 text-xs">
-          Aún no hay secciones en este examen. Haz clic en "Agregar seccion" para comenzar.
-        </div>
-      `;
-      return;
-    }
 
     partsData.forEach((part, partIdx) => {
       const isPartActive = partIdx === lastActivePartIdx;
-      const partHtml = `
-        <div class="p-6 rounded-3xl border shadow-sm space-y-4 relative transition-all duration-300 cursor-pointer ${isPartActive ? 'bg-white border-purple-300 ring-4 ring-purple-100' : 'bg-white/80 border-blue-100/70'}" data-part-id="${part.id}" data-idx="${partIdx}">
+      const sectionHeader = sectionsMode ? `
           <button type="button" class="btn-delete-part absolute top-4 right-4 text-rose-400 hover:text-rose-600 text-xs font-bold transition" data-idx="${partIdx}">
             <i class="fa-regular fa-trash-can mr-1"></i> Eliminar Sección
           </button>
@@ -472,14 +563,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             <label class="block text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Nombre de la Sección</label>
             <input
               type="text"
-              value="${part.title}"
+              value="${escapeHTML(part.title || '')}"
               class="part-title-input px-3 py-2 w-full border border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded-xl text-sm font-semibold"
               data-idx="${partIdx}"
             >
           </div>
+      ` : '';
 
-          <div class="space-y-3 pt-2">
-            <span class="text-xs font-bold text-gray-600 block"><i class="fa-solid fa-clipboard-question text-blue-400 mr-1"></i> Enunciados / Preguntas</span>
+      const partHtml = `
+        <div class="p-6 rounded-3xl border shadow-sm space-y-4 relative transition-all duration-300 cursor-pointer ${isPartActive ? 'bg-white border-purple-300 ring-4 ring-purple-100' : 'bg-white/80 border-blue-100/70'}" data-part-id="${part.id}" data-idx="${partIdx}">
+          ${sectionHeader}
+
+          <div class="space-y-3 ${sectionsMode ? 'pt-2' : ''}">
+            <span class="text-xs font-bold text-gray-600 block"><i class="fa-solid fa-clipboard-question text-blue-400 mr-1"></i> ${sectionsMode ? 'Enunciados / Preguntas' : 'Preguntas'}</span>
 
             <div class="part-questions-list space-y-3" data-idx="${partIdx}">
               ${renderQuestionsForPart(part.questions, partIdx)}
@@ -536,9 +632,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.querySelectorAll('.btn-delete-part').forEach(btn => {
       btn.addEventListener('click', () => {
-        const idx = btn.getAttribute('data-idx');
+        const idx = parseInt(btn.getAttribute('data-idx'));
         partsData.splice(idx, 1);
-        if (lastActivePartIdx >= partsData.length && partsData.length > 0) {
+        if (partsData.length === 0) {
+          partsData = [{ id: "part_" + Date.now(), title: "", questions: [] }];
+          lastActivePartIdx = 0;
+        } else if (lastActivePartIdx >= partsData.length) {
           lastActivePartIdx = partsData.length - 1;
         }
         renderParts();
@@ -558,7 +657,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderQuestionsForPart(questions, partIdx) {
     if (questions.length === 0) {
-      return `<div class="text-center py-4 bg-blue-50/10 rounded-xl border border-dashed border-blue-100 text-[11px] text-gray-400">No hay preguntas en esta sección.</div>`;
+      return `<div class="text-center py-4 bg-blue-50/10 rounded-xl border border-dashed border-blue-100 text-[11px] text-gray-400">No hay preguntas todavía.</div>`;
     }
 
     return questions.map((q, qIdx) => {
@@ -620,21 +719,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
       } else if (q.type === 'proyectos') {
         extraHtml = `
-          <div class="mt-2 grid grid-cols-1 gap-2">
-            <div class="bg-white rounded-xl border border-teal-100 p-2.5">
-              <span class="text-[9px] font-bold text-teal-600 uppercase tracking-wide">Descripción</span>
-              <div class="mt-1.5 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30"></div>
+          <div class="mt-2 space-y-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[10px] font-bold text-teal-600">¿Has desarrollado proyectos?</span>
+              <span class="px-2.5 py-0.5 rounded-lg bg-teal-500 text-white text-[9px] font-bold">Sí</span>
+              <span class="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[9px] font-bold">No</span>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div class="bg-white rounded-xl border border-teal-100 p-2.5">
-                <span class="text-[9px] font-bold text-teal-600 uppercase tracking-wide">Link de proyectos</span>
-                <div class="mt-1.5 h-7 rounded-lg border border-dashed border-teal-100 bg-teal-50/30"></div>
-              </div>
-              <div class="bg-white rounded-xl border border-teal-100 p-2.5">
-                <span class="text-[9px] font-bold text-teal-600 uppercase tracking-wide">Tecnologías / Frameworks utilizados</span>
-                <div class="mt-1.5 h-7 rounded-lg border border-dashed border-teal-100 bg-teal-50/30"></div>
-              </div>
+            <div class="grid grid-cols-12 gap-2 items-start">
+              <div class="col-span-5 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30 px-2 py-1.5 text-[9px] text-teal-500">Descripción</div>
+              <div class="col-span-3 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30 px-2 py-1.5 text-[9px] text-teal-500">Link</div>
+              <div class="col-span-3 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30 px-2 py-1.5 text-[9px] text-teal-500">Tecnologías</div>
+              <div class="col-span-1 h-9 rounded-lg border border-dashed border-rose-100 bg-rose-50/30"></div>
             </div>
+            <span class="inline-flex items-center gap-1 text-[10px] font-bold text-teal-600"><i class="fa-solid fa-plus"></i> Agregar proyecto</span>
           </div>
         `;
       } else if (q.type === 'canvas') {
@@ -750,7 +847,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ${q.type === 'proyectos' ? '' : `
             <input
               type="text"
-              value="${q.text}"
+              value="${escapeHTML(q.text)}"
               class="q-text-input px-4 py-2.5 w-full border border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded-xl text-sm font-semibold text-gray-800"
               data-part-idx="${partIdx}"
               data-q-idx="${qIdx}"
@@ -917,24 +1014,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const name = examNameInput.value.trim();
     const description = examDescInput.value.trim();
 
-    if (partsData.length === 0) {
-      showAlert("Agrega al menos una sección al examen.", true);
-      return;
-    }
+    ensureParts();
+    const sectionsMode = isSectionsMode();
 
     // Validaciones
     for (const part of partsData) {
-      if (!part.title.trim()) {
+      if (sectionsMode && !String(part.title || '').trim()) {
         showAlert("Todas las secciones deben de tener nombre.", true);
         return;
       }
       if (part.questions.length === 0) {
-        showAlert(`La sección "${part.title}" no contiene preguntas.`, true);
+        showAlert(sectionsMode ? `La sección "${part.title}" no contiene preguntas.` : "El examen no contiene preguntas.", true);
         return;
       }
       for (const q of part.questions) {
         if (q.type !== 'proyectos' && !(q.text || '').trim()) {
-          showAlert(`La sección "${part.title}" tiene enunciados vacíos.`, true);
+          showAlert(sectionsMode ? `La sección "${part.title}" tiene enunciados vacíos.` : "Hay enunciados vacíos en el examen.", true);
           return;
         }
         if (q.type === 'multiple') {
@@ -1061,9 +1156,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     partsData.forEach((part, partIdx) => {
       let partHtml = `
         <div class="bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100/50 shadow-sm space-y-4">
-          <h3 class="text-sm font-bold text-indigo-700 flex items-center gap-1.5 border-b border-indigo-100 pb-2">
+          ${part.title ? `<h3 class="text-sm font-bold text-indigo-700 flex items-center gap-1.5 border-b border-indigo-100 pb-2">
             ${escapeHTML(part.title)}
-          </h3>
+          </h3>` : ''}
           <div class="space-y-4">
       `;
 
@@ -1100,22 +1195,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             <textarea rows="3" class="sim-tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none text-black" data-q-id="${q.id}"></textarea>
           `;
         } else if (q.type === 'proyectos') {
+          const projectState = normalizeSimProjectAnswer(null);
+          const rowsHtml = projectState.projects.map(p => simProjectRowHtml(q.id, p)).join('');
           widget = `
-            <div class="mt-2 grid grid-cols-1 gap-2">
-              <div class="space-y-1">
-                <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Descripción</label>
-                <textarea rows="2" class="sim-proj-description w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" data-q-id="${q.id}"></textarea>
+            <div class="mt-2 space-y-2 sim-proj-block" data-q-id="${q.id}" data-has-project="">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-semibold text-gray-700">¿Has desarrollado proyectos?</span>
+                <button type="button" class="sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-teal-100 hover:bg-teal-50" data-q-id="${q.id}">Sí</button>
+                <button type="button" class="sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50" data-q-id="${q.id}">No</button>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div class="space-y-1">
-                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Link de proyectos</label>
-                  <input type="url" placeholder="https://" class="sim-proj-link w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" data-q-id="${q.id}">
-                </div>
-                <div class="space-y-1">
-                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Tecnologías / Frameworks utilizados</label>
-                  <input type="text" class="sim-proj-tech w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" data-q-id="${q.id}">
-                </div>
+              <div class="sim-proj-list space-y-2 hidden" data-q-id="${q.id}">
+                ${rowsHtml}
               </div>
+              <button type="button" class="sim-proj-add hidden inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-600 hover:text-teal-700 mt-1" data-q-id="${q.id}">
+                <i class="fa-solid fa-plus"></i> Agregar proyecto
+              </button>
             </div>
           `;
         } else if (q.type === 'programacion') {
@@ -1413,24 +1507,83 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    document.querySelectorAll('.sim-proj-description, .sim-proj-link, .sim-proj-tech').forEach(el => {
-      el.addEventListener('input', () => {
-        const qId = el.getAttribute('data-q-id');
-        const desc = document.querySelector(`.sim-proj-description[data-q-id="${qId}"]`);
-        const link = document.querySelector(`.sim-proj-link[data-q-id="${qId}"]`);
-        const tech = document.querySelector(`.sim-proj-tech[data-q-id="${qId}"]`);
-        const project = {
-          description: desc ? desc.value.trim() : '',
-          link: link ? link.value.trim() : '',
-          technologies: tech ? tech.value.trim() : ''
-        };
-        if (project.description || project.link || project.technologies) {
-          simAnswers[qId] = project;
+    document.querySelectorAll('.sim-proj-block').forEach(block => {
+      const qId = block.getAttribute('data-q-id');
+      const list = block.querySelector('.sim-proj-list');
+      const addBtn = block.querySelector('.sim-proj-add');
+
+      const sync = () => {
+        const hasProject = block.getAttribute('data-has-project');
+        if (hasProject === 'false') {
+          simAnswers[qId] = { hasProject: false, projects: [] };
+        } else if (hasProject === 'true') {
+          const projects = [...list.querySelectorAll('.sim-proj-row')].map(row => ({
+            description: row.querySelector('.sim-proj-description').value.trim(),
+            link: row.querySelector('.sim-proj-link').value.trim(),
+            technologies: row.querySelector('.sim-proj-tech').value.trim()
+          })).filter(p => p.description || p.link || p.technologies);
+          if (projects.length > 0) {
+            simAnswers[qId] = { hasProject: true, projects };
+          } else {
+            delete simAnswers[qId];
+          }
         } else {
           delete simAnswers[qId];
         }
         updateSimProgress(Object.keys(simAnswers).length, qCount);
+      };
+
+      const updateRemoveButtons = () => {
+        const rows = [...list.querySelectorAll('.sim-proj-row')];
+        rows.forEach(row => {
+          const btn = row.querySelector('.sim-proj-remove');
+          if (btn) btn.classList.toggle('invisible', rows.length <= 1);
+        });
+      };
+
+      const applyChoice = (choice) => {
+        block.setAttribute('data-has-project', choice === 'yes' ? 'true' : 'false');
+        const yesBtn = block.querySelector('.sim-proj-yes');
+        const noBtn = block.querySelector('.sim-proj-no');
+        yesBtn.className = choice === 'yes'
+          ? 'sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-teal-500 text-white border-teal-500 shadow-sm'
+          : 'sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-teal-100 hover:bg-teal-50';
+        noBtn.className = choice === 'no'
+          ? 'sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-slate-600 text-white border-slate-600 shadow-sm'
+          : 'sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50';
+        list.classList.toggle('hidden', choice !== 'yes');
+        addBtn.classList.toggle('hidden', choice !== 'yes');
+        if (choice === 'yes' && !list.querySelector('.sim-proj-row')) {
+          list.insertAdjacentHTML('beforeend', simProjectRowHtml(qId));
+        }
+        updateRemoveButtons();
+        sync();
+      };
+
+      block.querySelector('.sim-proj-yes').addEventListener('click', () => applyChoice('yes'));
+      block.querySelector('.sim-proj-no').addEventListener('click', () => applyChoice('no'));
+
+      addBtn.addEventListener('click', () => {
+        list.insertAdjacentHTML('beforeend', simProjectRowHtml(qId));
+        updateRemoveButtons();
+        sync();
+        const rows = list.querySelectorAll('.sim-proj-row');
+        const last = rows[rows.length - 1];
+        if (last) last.querySelector('.sim-proj-description').focus();
       });
+
+      list.addEventListener('input', sync);
+
+      list.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.sim-proj-remove');
+        if (!removeBtn) return;
+        if (list.querySelectorAll('.sim-proj-row').length <= 1) return;
+        removeBtn.closest('.sim-proj-row').remove();
+        updateRemoveButtons();
+        sync();
+      });
+
+      updateRemoveButtons();
     });
 
     // Initialize Interactive Canvas and Programming environments
@@ -2226,7 +2379,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnSimSubmit) {
     btnSimSubmit.addEventListener('click', () => {
       const missingRequired = partsData.reduce((acc, p) =>
-        acc + p.questions.filter(q => q.type !== 'proyectos' && !simAnswers[q.id]).length, 0);
+        acc + p.questions.filter(q => {
+          const ans = simAnswers[q.id];
+          if (q.type === 'proyectos') {
+            if (!ans || typeof ans !== 'object' || (ans.hasProject !== true && ans.hasProject !== false)) return true;
+            if (ans.hasProject === true) {
+              const projects = Array.isArray(ans.projects)
+                ? ans.projects.filter(p => p.description || p.link || p.technologies)
+                : [];
+              return projects.length === 0;
+            }
+            return false;
+          }
+          return !ans;
+        }).length, 0);
       if (missingRequired > 0) {
         showPastelAlert("Por favor, responde todas las preguntas del examen simulado para ver tus resultados de prueba.", "Aviso");
         return;
@@ -2239,9 +2405,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       partsData.forEach((part) => {
         reportHtml += `
-          <div class="border-b border-indigo-100 pb-2 mb-2 mt-4 text-black">
+          ${part.title ? `<div class="border-b border-indigo-100 pb-2 mb-2 mt-4 text-black">
             <h4 class="text-sm font-bold text-indigo-700">${escapeHTML(part.title)}</h4>
-          </div>
+          </div>` : ''}
           <div class="space-y-4">
         `;
 
@@ -2260,18 +2426,36 @@ document.addEventListener('DOMContentLoaded', async () => {
               <p class="text-xs text-gray-600 mt-1"><strong>Tu respuesta:</strong> ${escapeHTML(ans || "Sin respuesta")}</p>
             `;
           } else if (q.type === 'proyectos') {
-            const project = ans && typeof ans === 'object' ? ans : {};
-            const linkUrl = normalizeUrl(project.link);
+            const raw = ans && typeof ans === 'object' ? ans : {};
+            let projects = [];
+            if (Array.isArray(raw.projects)) {
+              projects = raw.projects;
+            } else if (raw.description || raw.link || raw.technologies) {
+              projects = [raw];
+            }
+            projects = projects.filter(p => p && (p.description || p.link || p.technologies));
             statusBadge = `
               <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
                 <i class="fa-solid fa-folder-open"></i> Evaluación Manual
               </span>
             `;
-            comparisonDetails = `
-              <p class="text-xs text-gray-600 mt-1"><strong>Descripción:</strong> ${escapeHTML(project.description || "Sin respuesta")}</p>
-              <p class="text-xs text-gray-600"><strong>Link:</strong> ${linkUrl ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline break-all">${escapeHTML(project.link)}</a>` : escapeHTML(project.link || "Sin respuesta")}</p>
-              <p class="text-xs text-gray-600"><strong>Tecnologías:</strong> ${escapeHTML(project.technologies || "Sin respuesta")}</p>
-            `;
+            if (raw.hasProject === false) {
+              comparisonDetails = `<p class="text-xs text-gray-600 mt-1">No ha desarrollado proyectos.</p>`;
+            } else if (projects.length === 0) {
+              comparisonDetails = `<p class="text-xs text-gray-400 mt-1">Sin respuesta</p>`;
+            } else {
+              comparisonDetails = projects.map((project, pIdx) => {
+                const linkUrl = normalizeUrl(project.link);
+                return `
+                  <div class="mt-2 bg-teal-50/40 p-2.5 rounded-xl border border-teal-100 space-y-1">
+                    <span class="text-[9px] font-bold text-teal-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
+                    <p class="text-xs text-gray-600"><strong>Descripción:</strong> ${escapeHTML(project.description || "Sin respuesta")}</p>
+                    <p class="text-xs text-gray-600"><strong>Link:</strong> ${linkUrl ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline break-all">${escapeHTML(project.link)}</a>` : escapeHTML(project.link || "Sin respuesta")}</p>
+                    <p class="text-xs text-gray-600"><strong>Tecnologías:</strong> ${escapeHTML(project.technologies || "Sin respuesta")}</p>
+                  </div>
+                `;
+              }).join('');
+            }
           } else if (q.type === 'canvas') {
             statusBadge = `
               <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
@@ -2356,12 +2540,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         reportHtml += `</div>`;
       });
 
-      const scorePercent = gradableCount > 0 ? Math.round((correctCount / gradableCount) * 100) : 100;
-      const scoreHtml = `
+      const scorePercent = gradableCount > 0 ? Math.round((correctCount / gradableCount) * 100) : 0;
+      const scoreHtml = gradableCount > 0 ? `
         <div class="text-center bg-indigo-50/60 p-5 rounded-2xl border border-indigo-100 mb-6 text-black">
           <p class="text-xs text-indigo-500 font-bold uppercase tracking-wider">Calificación Calificable</p>
           <p class="text-5xl font-extrabold text-indigo-700 mt-1">${correctCount} <span class="text-2xl text-indigo-400">/ ${gradableCount}</span></p>
           <p class="text-xs text-gray-500 mt-2 font-medium">Porcentaje de acierto: <strong class="text-indigo-600 font-bold">${scorePercent}%</strong></p>
+        </div>
+        <div class="space-y-4">
+          ${reportHtml}
+        </div>
+      ` : `
+        <div class="text-center bg-indigo-50/60 p-5 rounded-2xl border border-indigo-100 mb-6 text-black">
+          <p class="text-xs text-indigo-500 font-bold uppercase tracking-wider">Evaluación cualitativa</p>
+          <p class="text-sm text-gray-500 mt-2 font-medium">Este examen no tiene preguntas calificables.</p>
         </div>
         <div class="space-y-4">
           ${reportHtml}

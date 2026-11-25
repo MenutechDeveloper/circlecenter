@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       assignedTechnicalExamsList = [];
       const examIdsToFetch = [];
 
-      if (selectedCandidate.assigned_exams && Array.isArray(selectedCandidate.assigned_exams)) {
+      if (selectedCandidate.assigned_exams && Array.isArray(selectedCandidate.assigned_exams) && selectedCandidate.assigned_exams.length > 0) {
         selectedCandidate.assigned_exams.forEach(e => {
           if (e.id) examIdsToFetch.push(e.id);
         });
@@ -198,6 +198,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         ? "Continuar al Examen Psicométrico"
         : "Continuar al Examen";
     }
+  }
+
+  function normalizeProjectAnswer(raw) {
+    const value = raw && typeof raw === 'object' ? raw : {};
+    let projects = [];
+    if (Array.isArray(value.projects)) {
+      projects = value.projects;
+    } else if (value.description || value.link || value.technologies) {
+      projects = [value];
+    }
+    const hasProject = value.hasProject === true || value.hasProject === false ? value.hasProject : null;
+    return {
+      hasProject,
+      projects: projects.length > 0 ? projects : [{ description: '', link: '', technologies: '' }]
+    };
+  }
+
+  function projectRowHtml(qId, project = {}) {
+    return `
+      <div class="tech-proj-row grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
+        <textarea rows="1" class="tech-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none resize-y" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
+        <input type="url" class="tech-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
+        <input type="text" class="tech-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
+        <button type="button" class="tech-proj-remove md:col-span-1 w-9 h-[38px] rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center justify-self-end md:justify-self-auto transition" title="Quitar proyecto">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+    `;
   }
 
   // Renderizar dinámicamente el Formulario de Registro
@@ -281,9 +309,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     psychometricExam.parts.forEach(part => {
       let partHtml = `
         <div class="bg-blue-50/30 p-5 rounded-2xl border border-blue-100 shadow-sm space-y-4">
-          <h3 class="text-sm font-bold text-blue-700 flex items-center gap-1.5 border-b border-blue-100 pb-2">
-            ${part.title}
-          </h3>
+          ${part.title ? `<h3 class="text-sm font-bold text-blue-700 flex items-center gap-1.5 border-b border-blue-100 pb-2">
+            ${escapeHTML(part.title)}
+          </h3>` : ''}
           <div class="space-y-4">
       `;
 
@@ -401,7 +429,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     techExamTitle.innerHTML = `Examen: <span class="text-blue-600 font-extrabold">${exam.name}</span>`;
-    techExamDesc.textContent = exam.description || "Evaluación práctica de profesión.";
+    if (exam.description && exam.description.trim()) {
+      techExamDesc.textContent = exam.description;
+      techExamDesc.classList.remove('hidden');
+    } else {
+      techExamDesc.textContent = '';
+      techExamDesc.classList.add('hidden');
+    }
 
     // Inicializar respuestas para este examen si no existen
     if (!technicalAnswersByExam[exam.id]) {
@@ -421,9 +455,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     exam.parts.forEach(part => {
       let partHtml = `
         <div class="bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100/50 shadow-sm space-y-4">
-          <h3 class="text-sm font-bold text-indigo-700 flex items-center gap-1.5 border-b border-indigo-100 pb-2">
-            ${part.title}
-          </h3>
+          ${part.title ? `<h3 class="text-sm font-bold text-indigo-700 flex items-center gap-1.5 border-b border-indigo-100 pb-2">
+            ${escapeHTML(part.title)}
+          </h3>` : ''}
           <div class="space-y-4">
       `;
 
@@ -461,26 +495,26 @@ document.addEventListener('DOMContentLoaded', async () => {
           `;
         } else if (q.type === 'short') {
           widget = `
-            <textarea rows="3" class="tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none" data-q-id="${q.id}">${savedVal}</textarea>
+            <textarea rows="3" class="tech-textarea-input w-full mt-2 px-3 py-2 rounded-xl border border-indigo-100 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none" data-q-id="${q.id}">${escapeHTML(savedVal || '')}</textarea>
           `;
         } else if (q.type === 'proyectos') {
-          const savedProject = (savedVal && typeof savedVal === 'object') ? savedVal : {};
+          const projectState = normalizeProjectAnswer(savedVal);
+          const isYes = projectState.hasProject === true;
+          const isNo = projectState.hasProject === false;
+          const rowsHtml = projectState.projects.map(p => projectRowHtml(q.id, p)).join('');
           widget = `
-            <div class="mt-2 grid grid-cols-1 gap-2">
-              <div class="space-y-1">
-                <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Descripción</label>
-                <textarea rows="2" class="tech-proj-description w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" data-q-id="${q.id}">${escapeHTML(savedProject.description || '')}</textarea>
+            <div class="mt-2 space-y-2 tech-proj-block" data-q-id="${q.id}" data-has-project="${isYes ? 'true' : isNo ? 'false' : ''}">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-semibold text-gray-700">¿Has desarrollado proyectos?</span>
+                <button type="button" class="tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isYes ? 'bg-teal-500 text-white border-teal-500 shadow-sm' : 'bg-white text-gray-600 border-teal-100 hover:bg-teal-50'}" data-q-id="${q.id}">Sí</button>
+                <button type="button" class="tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isNo ? 'bg-slate-600 text-white border-slate-600 shadow-sm' : 'bg-white text-gray-600 border-slate-200 hover:bg-slate-50'}" data-q-id="${q.id}">No</button>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div class="space-y-1">
-                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Link de proyectos</label>
-                  <input type="url" placeholder="https://" class="tech-proj-link w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" data-q-id="${q.id}" value="${escapeHTML(savedProject.link || '')}">
-                </div>
-                <div class="space-y-1">
-                  <label class="text-[10px] font-bold text-teal-600 uppercase tracking-wide block">Tecnologías / Frameworks utilizados</label>
-                  <input type="text" class="tech-proj-tech w-full px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" data-q-id="${q.id}" value="${escapeHTML(savedProject.technologies || '')}">
-                </div>
+              <div class="tech-proj-list space-y-2 ${isYes ? '' : 'hidden'}" data-q-id="${q.id}">
+                ${rowsHtml}
               </div>
+              <button type="button" class="tech-proj-add ${isYes ? '' : 'hidden'} inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-600 hover:text-teal-700 mt-1" data-q-id="${q.id}">
+                <i class="fa-solid fa-plus"></i> Agregar proyecto
+              </button>
             </div>
           `;
         } else if (q.type === 'programacion') {
@@ -802,24 +836,83 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    document.querySelectorAll('.tech-proj-description, .tech-proj-link, .tech-proj-tech').forEach(el => {
-      el.addEventListener('input', () => {
-        const qId = el.getAttribute('data-q-id');
-        const desc = techQuestionsContainer.querySelector(`.tech-proj-description[data-q-id="${qId}"]`);
-        const link = techQuestionsContainer.querySelector(`.tech-proj-link[data-q-id="${qId}"]`);
-        const tech = techQuestionsContainer.querySelector(`.tech-proj-tech[data-q-id="${qId}"]`);
-        const project = {
-          description: desc ? desc.value.trim() : '',
-          link: link ? link.value.trim() : '',
-          technologies: tech ? tech.value.trim() : ''
-        };
-        if (project.description || project.link || project.technologies) {
-          currentAnswers[qId] = project;
+    document.querySelectorAll('.tech-proj-block').forEach(block => {
+      const qId = block.getAttribute('data-q-id');
+      const list = block.querySelector('.tech-proj-list');
+      const addBtn = block.querySelector('.tech-proj-add');
+
+      const sync = () => {
+        const hasProject = block.getAttribute('data-has-project');
+        if (hasProject === 'false') {
+          currentAnswers[qId] = { hasProject: false, projects: [] };
+        } else if (hasProject === 'true') {
+          const projects = [...list.querySelectorAll('.tech-proj-row')].map(row => ({
+            description: row.querySelector('.tech-proj-description').value.trim(),
+            link: row.querySelector('.tech-proj-link').value.trim(),
+            technologies: row.querySelector('.tech-proj-tech').value.trim()
+          })).filter(p => p.description || p.link || p.technologies);
+          if (projects.length > 0) {
+            currentAnswers[qId] = { hasProject: true, projects };
+          } else {
+            delete currentAnswers[qId];
+          }
         } else {
           delete currentAnswers[qId];
         }
         updateProgress(techProgressText, Object.keys(currentAnswers).length, qCount);
+      };
+
+      const updateRemoveButtons = () => {
+        const rows = [...list.querySelectorAll('.tech-proj-row')];
+        rows.forEach(row => {
+          const btn = row.querySelector('.tech-proj-remove');
+          if (btn) btn.classList.toggle('invisible', rows.length <= 1);
+        });
+      };
+
+      const applyChoice = (choice) => {
+        block.setAttribute('data-has-project', choice === 'yes' ? 'true' : 'false');
+        const yesBtn = block.querySelector('.tech-proj-yes');
+        const noBtn = block.querySelector('.tech-proj-no');
+        const yesActive = 'tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-teal-500 text-white border-teal-500 shadow-sm';
+        const yesInactive = 'tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-teal-100 hover:bg-teal-50';
+        const noActive = 'tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-slate-600 text-white border-slate-600 shadow-sm';
+        const noInactive = 'tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50';
+        yesBtn.className = choice === 'yes' ? yesActive : yesInactive;
+        noBtn.className = choice === 'no' ? noActive : noInactive;
+        list.classList.toggle('hidden', choice !== 'yes');
+        addBtn.classList.toggle('hidden', choice !== 'yes');
+        if (choice === 'yes' && !list.querySelector('.tech-proj-row')) {
+          list.insertAdjacentHTML('beforeend', projectRowHtml(qId));
+        }
+        updateRemoveButtons();
+        sync();
+      };
+
+      block.querySelector('.tech-proj-yes').addEventListener('click', () => applyChoice('yes'));
+      block.querySelector('.tech-proj-no').addEventListener('click', () => applyChoice('no'));
+
+      addBtn.addEventListener('click', () => {
+        list.insertAdjacentHTML('beforeend', projectRowHtml(qId));
+        updateRemoveButtons();
+        sync();
+        const rows = list.querySelectorAll('.tech-proj-row');
+        const last = rows[rows.length - 1];
+        if (last) last.querySelector('.tech-proj-description').focus();
       });
+
+      list.addEventListener('input', sync);
+
+      list.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.tech-proj-remove');
+        if (!removeBtn) return;
+        if (list.querySelectorAll('.tech-proj-row').length <= 1) return;
+        removeBtn.closest('.tech-proj-row').remove();
+        updateRemoveButtons();
+        sync();
+      });
+
+      updateRemoveButtons();
     });
   }
 
@@ -827,11 +920,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const exam = assignedTechnicalExamsList[currentTechnicalExamIndex];
     if (!exam) return;
 
-    // Los bloques de proyectos son opcionales: un candidato sin proyecto puede avanzar.
     const currentAnswers = technicalAnswersByExam[exam.id] || {};
     let missingRequired = 0;
     (exam.parts || []).forEach(p => p.questions.forEach(q => {
-      if (q.type !== 'proyectos' && !currentAnswers[q.id]) missingRequired++;
+      const ans = currentAnswers[q.id];
+      if (q.type === 'proyectos') {
+        if (!ans || typeof ans !== 'object' || (ans.hasProject !== true && ans.hasProject !== false)) {
+          missingRequired++;
+        } else if (ans.hasProject === true) {
+          const projects = Array.isArray(ans.projects)
+            ? ans.projects.filter(p => p.description || p.link || p.technologies)
+            : [];
+          if (projects.length === 0) missingRequired++;
+        }
+      } else if (!ans) {
+        missingRequired++;
+      }
     }));
     if (missingRequired > 0) {
       showPastelAlert("Por favor, responde todas las preguntas de este examen técnico para poder avanzar.");
@@ -879,7 +983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const partsCopy = JSON.parse(JSON.stringify(exam.parts || []));
         partsCopy.forEach(part => {
           // Diferenciar el título de la sección por el nombre del examen para mayor claridad en perfiles
-          part.title = `${exam.name} - ${part.title}`;
+          part.title = part.title ? `${exam.name} - ${part.title}` : exam.name;
           part.questions.forEach(q => {
             q.userAnswer = examAnswers[q.id] || "";
             const isGradable = q.type === 'multiple' || q.type === 'boolean' || q.type === 'programacion';

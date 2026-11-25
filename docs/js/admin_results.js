@@ -119,10 +119,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       const date = new Date(res.created_at).toLocaleDateString('es-ES', {
         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
       });
-      const scoreText = res.max_score > 0 ? `${res.score} / ${res.max_score}` : 'Libre / Abierto';
+      const scoreText = res.max_score > 0 ? `${res.score} / ${res.max_score}` : 'Cualitativa';
       const scorePercent = res.max_score > 0 ? Math.round((res.score / res.max_score) * 100) : 100;
 
-      let badgeColor = "bg-emerald-50 text-emerald-700 border border-emerald-100";
+      let badgeColor = res.max_score > 0
+        ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+        : "bg-teal-50 text-teal-700 border border-teal-100";
       if (res.max_score > 0) {
         if (scorePercent < 60) badgeColor = "bg-rose-50 text-rose-700 border border-rose-100";
         else if (scorePercent < 80) badgeColor = "bg-amber-50 text-amber-700 border border-amber-100";
@@ -280,9 +282,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     parts.forEach(part => {
+      const partTitle = part.title && String(part.title).trim() ? part.title : 'Preguntas';
       let partHtml = `
         <div class="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50 space-y-3">
-          <h5 class="text-xs font-bold text-blue-700 border-b border-blue-100/50 pb-1.5"><i class="fa-solid fa-folder-open mr-1"></i> ${part.title}</h5>
+          <h5 class="text-xs font-bold text-blue-700 border-b border-blue-100/50 pb-1.5"><i class="fa-solid fa-folder-open mr-1"></i> ${escapeHTML(partTitle)}</h5>
           <div class="space-y-3 divide-y divide-blue-50/50">
       `;
 
@@ -327,28 +330,57 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let answerWidget = "";
         if (q.type === 'proyectos') {
-          const project = q.userAnswer && typeof q.userAnswer === 'object' ? q.userAnswer : {};
-          const linkUrl = normalizeUrl(project.link);
-          answerWidget = `
-            <div class="col-span-2 mt-1 space-y-2">
-              <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs">
-                <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Descripción</strong>
-                <span class="font-medium text-gray-700 whitespace-pre-wrap">${escapeHTML(project.description || 'Sin responder')}</span>
+          const raw = q.userAnswer && typeof q.userAnswer === 'object' ? q.userAnswer : {};
+          let projects = [];
+          if (Array.isArray(raw.projects)) {
+            projects = raw.projects;
+          } else if (raw.description || raw.link || raw.technologies) {
+            projects = [raw];
+          }
+          projects = projects.filter(p => p && (p.description || p.link || p.technologies));
+
+          if (raw.hasProject === false) {
+            answerWidget = `
+              <div class="col-span-2 mt-1 bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs font-semibold text-gray-600">
+                No ha desarrollado proyectos.
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100">
-                  <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Link de proyectos</strong>
-                  ${linkUrl
-                    ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-600 hover:text-blue-700 underline break-all inline-flex items-center gap-1"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>${escapeHTML(project.link)}</a>`
-                    : `<span class="font-medium text-gray-400">${escapeHTML(project.link || 'Sin responder')}</span>`}
-                </div>
-                <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100">
-                  <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Tecnologías / Frameworks utilizados</strong>
-                  <span class="font-medium text-gray-700">${escapeHTML(project.technologies || 'Sin responder')}</span>
-                </div>
+            `;
+          } else if (projects.length === 0) {
+            answerWidget = `
+              <div class="col-span-2 mt-1 bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs font-semibold text-gray-400">
+                Sin responder
               </div>
-            </div>
-          `;
+            `;
+          } else {
+            answerWidget = `
+              <div class="col-span-2 mt-1 space-y-2">
+                ${projects.map((project, pIdx) => {
+                  const linkUrl = normalizeUrl(project.link);
+                  return `
+                    <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs space-y-2">
+                      <span class="text-[9px] font-bold text-teal-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
+                      <div>
+                        <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Descripción</strong>
+                        <span class="font-medium text-gray-700 whitespace-pre-wrap">${escapeHTML(project.description || 'Sin responder')}</span>
+                      </div>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Link</strong>
+                          ${linkUrl
+                            ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-600 hover:text-blue-700 underline break-all inline-flex items-center gap-1"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>${escapeHTML(project.link)}</a>`
+                            : `<span class="font-medium text-gray-400">${escapeHTML(project.link || 'Sin responder')}</span>`}
+                        </div>
+                        <div>
+                          <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Tecnologías / Frameworks</strong>
+                          <span class="font-medium text-gray-700">${escapeHTML(project.technologies || 'Sin responder')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `;
+          }
         } else if (q.type === 'canvas') {
           if (q.userAnswer && q.userAnswer.startsWith('data:image/')) {
             answerWidget = `
