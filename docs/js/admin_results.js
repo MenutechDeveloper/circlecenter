@@ -13,15 +13,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalCloseBtn = document.getElementById('modal-close-btn');
   const modalCloseBottomBtn = document.getElementById('modal-close-bottom-btn');
   const modalPrintBtn = document.getElementById('modal-print-btn');
+  const modalDeleteBtn = document.getElementById('modal-delete-btn');
   const modalCandName = document.getElementById('modal-cand-name');
   const modalCandPos = document.getElementById('modal-cand-pos');
-  const modalCandEmail = document.getElementById('modal-cand-email');
-  const modalCandPhone = document.getElementById('modal-cand-phone');
   const modalCandScore = document.getElementById('modal-cand-score');
   const modalCandPercentage = document.getElementById('modal-cand-percentage');
   const modalCandInfoFields = document.getElementById('modal-cand-info-fields');
-  const modalTabPsyBtn = document.getElementById('modal-tab-psy-btn');
-  const modalTabTechBtn = document.getElementById('modal-tab-tech-btn');
   const modalAnswersPsy = document.getElementById('modal-answers-psy');
   const modalAnswersTech = document.getElementById('modal-answers-tech');
 
@@ -180,9 +177,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             ${date}
           </td>
           <td class="py-4 px-4 text-right">
-            <button class="view-report-btn px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs transition" data-id="${res.id}">
-              <i class="fa-regular fa-id-card mr-1"></i> Ver Reporte
-            </button>
+            <div class="flex items-center justify-end gap-2">
+              <button class="view-report-btn px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs transition" data-id="${res.id}">
+                <i class="fa-regular fa-id-card mr-1"></i> Ver Reporte
+              </button>
+              <button class="delete-report-btn px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-bold text-xs transition" data-id="${res.id}" title="Eliminar registro">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
           </td>
         </tr>
       `;
@@ -196,14 +198,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (report) showReportModal(report);
       });
     });
+
+    // Bind Delete click
+    document.querySelectorAll('.delete-report-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const report = allResults.find(r => r.id === id);
+        if (!report) return;
+        showPastelConfirm(
+          `¿Eliminar el registro de "${escapeHTML(report.candidate_name)}"? Esta acción no se puede deshacer.`,
+          (confirmed) => { if (confirmed) deleteResult(id); },
+          "Eliminar Registro"
+        );
+      });
+    });
+  }
+
+  async function deleteResult(id) {
+    try {
+      const { error } = await supabaseClient
+        .from('results')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      allResults = allResults.filter(r => r.id !== id);
+      distinctVacancies.clear();
+      allResults.forEach(r => {
+        if (r.assigned_exam_name) distinctVacancies.add(r.assigned_exam_name);
+      });
+      populateVacancyFilter();
+      renderResults();
+      showPastelAlert("Registro eliminado correctamente.");
+    } catch (err) {
+      console.error(err);
+      showPastelAlert("No se pudo eliminar el registro: " + err.message);
+    }
   }
 
   function showReportModal(report) {
     activeReport = report;
     modalCandName.textContent = report.candidate_name;
     modalCandPos.textContent = `Vacante de Interés: ${report.assigned_exam_name || 'General'}`;
-    modalCandEmail.textContent = report.candidate_email || 'No especificado';
-    modalCandPhone.textContent = report.candidate_phone || 'No especificado';
 
     // Contar correctas, incorrectas y vacías en examen técnico
     let correct = 0;
@@ -283,18 +320,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAnswers(modalAnswersPsy, report.psychometric_answers);
     renderAnswers(modalAnswersTech, report.technical_answers);
 
-    // Resetear Tabs
-    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
-    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
-    modalAnswersPsy.classList.remove('hidden');
-    modalAnswersTech.classList.add('hidden');
-
     resultModal.classList.remove('hidden');
   }
 
   function renderAnswers(container, answersData) {
     container.innerHTML = "";
-    const parts = answersData.parts || [];
+    const parts = (answersData && answersData.parts) || [];
     if (parts.length === 0) {
       container.innerHTML = `<div class="text-center py-4 text-gray-400 text-xs">No hay respuestas cargadas para este bloque.</div>`;
       return;
@@ -562,22 +593,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   modalCloseBtn.addEventListener('click', closeModal);
   modalCloseBottomBtn.addEventListener('click', closeModal);
 
-  modalTabPsyBtn.addEventListener('click', () => {
-    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
-    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
-    modalAnswersPsy.classList.remove('hidden');
-    modalAnswersTech.classList.add('hidden');
-  });
-
-  modalTabTechBtn.addEventListener('click', () => {
-    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
-    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
-    modalAnswersTech.classList.remove('hidden');
-    modalAnswersPsy.classList.add('hidden');
-  });
-
   modalPrintBtn.addEventListener('click', () => {
     window.print();
+  });
+
+  modalDeleteBtn.addEventListener('click', () => {
+    if (!activeReport) return;
+    const report = activeReport;
+    showPastelConfirm(
+      `¿Eliminar el registro de "${escapeHTML(report.candidate_name)}"? Esta acción no se puede deshacer.`,
+      (confirmed) => {
+        if (!confirmed) return;
+        closeModal();
+        deleteResult(report.id);
+      },
+      "Eliminar Registro"
+    );
   });
 
   resultsSearch.addEventListener('input', renderResults);
