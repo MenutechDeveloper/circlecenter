@@ -747,12 +747,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (q.type === 'multiple' || (q.type === 'programacion' && respType === 'multiple')) {
       const options = (Array.isArray(q.options) ? q.options : [])
         .filter(opt => opt !== undefined && opt !== null && String(opt).trim() !== '');
-      inputHtml = `
-        <select data-correct-input class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
-          <option value="">Selecciona la correcta...</option>
-          ${options.map(opt => `<option value="${escapeHTML(opt)}" ${String(opt) === String(q.correct) ? 'selected' : ''}>${escapeHTML(opt)}</option>`).join('')}
-        </select>
-      `;
+      inputHtml = options.length > 0
+        ? `
+          <select data-correct-input class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
+            <option value="">Selecciona la correcta...</option>
+            ${options.map(opt => `<option value="${escapeHTML(opt)}" ${String(opt) === String(q.correct) ? 'selected' : ''}>${escapeHTML(opt)}</option>`).join('')}
+          </select>
+        `
+        : `
+          <input data-correct-input type="text" value="${escapeHTML(q.correct || '')}" class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300" placeholder="Escribe la respuesta correcta...">
+        `;
     } else if (q.type === 'boolean') {
       inputHtml = `
         <select data-correct-input class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
