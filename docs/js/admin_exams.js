@@ -73,9 +73,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function simProjectRowHtml(qId, project = {}) {
     return `
       <div class="sim-proj-row grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
-        <textarea rows="1" class="sim-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none resize-y text-black" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
-        <input type="url" class="sim-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
-        <input type="text" class="sim-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none text-black" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
+        <textarea rows="1" class="sim-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none resize-y text-black" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
+        <input type="url" class="sim-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none text-black" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
+        <input type="text" class="sim-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none text-black" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
         <button type="button" class="sim-proj-remove md:col-span-1 w-9 h-[38px] rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center justify-self-end md:justify-self-auto transition" title="Quitar proyecto">
           <i class="fa-solid fa-xmark text-xs"></i>
         </button>
@@ -721,17 +721,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         extraHtml = `
           <div class="mt-2 space-y-2">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] font-bold text-teal-600">¿Has desarrollado proyectos?</span>
-              <span class="px-2.5 py-0.5 rounded-lg bg-teal-500 text-white text-[9px] font-bold">Sí</span>
+              <span class="text-[10px] font-bold text-blue-600">¿Has desarrollado proyectos?</span>
+              <span class="px-2.5 py-0.5 rounded-lg bg-blue-500 text-white text-[9px] font-bold">Sí</span>
               <span class="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[9px] font-bold">No</span>
             </div>
             <div class="grid grid-cols-12 gap-2 items-start">
-              <div class="col-span-5 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30 px-2 py-1.5 text-[9px] text-teal-500">Descripción</div>
-              <div class="col-span-3 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30 px-2 py-1.5 text-[9px] text-teal-500">Link</div>
-              <div class="col-span-3 h-9 rounded-lg border border-dashed border-teal-100 bg-teal-50/30 px-2 py-1.5 text-[9px] text-teal-500">Tecnologías</div>
+              <div class="col-span-5 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500">Descripción</div>
+              <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500">Link</div>
+              <div class="col-span-3 h-9 rounded-lg border border-dashed border-blue-100 bg-blue-50/30 px-2 py-1.5 text-[9px] text-blue-500">Tecnologías</div>
               <div class="col-span-1 h-9 rounded-lg border border-dashed border-rose-100 bg-rose-50/30"></div>
             </div>
-            <span class="inline-flex items-center gap-1 text-[10px] font-bold text-teal-600"><i class="fa-solid fa-plus"></i> Agregar proyecto</span>
+            <span class="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600"><i class="fa-solid fa-plus"></i> Agregar otro proyecto</span>
           </div>
         `;
       } else if (q.type === 'canvas') {
@@ -807,13 +807,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
               ` : `
                 <div>
-                  <label class="block text-[9px] font-bold text-indigo-500 uppercase">${respType === 'ide' ? 'Resultado / Output Esperado' : 'Respuesta Correcta'}</label>
+                  <label class="block text-[9px] font-bold text-indigo-500 uppercase">${respType === 'ide' ? 'Código / Output Esperado' : 'Respuesta Correcta'}</label>
                   <textarea
                     class="q-correct-code-input font-mono w-full px-3 py-1.5 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-emerald-400 h-16 custom-scroll"
                     data-part-idx="${partIdx}"
                     data-q-idx="${qIdx}"
-                    placeholder="${respType === 'ide' ? 'Escribe la respuesta esperada o el output compilado exacto...' : 'Escribe la respuesta exacta esperada...'}"
+                    placeholder="${respType === 'ide' ? 'Escribe el código esperado o el output compilado...' : 'Escribe la respuesta exacta esperada...'}"
                   >${q.correct || ''}</textarea>
+                  ${respType === 'ide' ? '<p class="text-[9px] text-gray-400 mt-1">La similitud se calcula en el reporte; el candidato no la ve.</p>' : ''}
                 </div>
               `}
             </div>
@@ -840,7 +841,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div>
             <div class="flex items-center gap-2 mb-1.5 select-none">
               <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
-                q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : q.type === 'proyectos' ? 'bg-teal-100 text-teal-800' : 'bg-indigo-100 text-indigo-800'
+                q.type === 'multiple' ? 'bg-blue-100 text-blue-700' : q.type === 'boolean' ? 'bg-sky-100 text-sky-700' : q.type === 'short' ? 'bg-amber-100 text-amber-800' : q.type === 'canvas' ? 'bg-purple-100 text-purple-800' : q.type === 'proyectos' ? 'bg-blue-100 text-blue-800' : 'bg-indigo-100 text-indigo-800'
               }">${q.type === 'multiple' ? 'Múltiple' : q.type === 'boolean' ? 'V / F' : q.type === 'short' ? 'Abierta' : q.type === 'canvas' ? 'Canvas (Ilustrador)' : q.type === 'proyectos' ? 'Proyectos' : 'Programación'}</span>
               ${q.type === 'proyectos' ? '' : `<span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>`}
             </div>
@@ -1201,14 +1202,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="mt-2 space-y-2 sim-proj-block" data-q-id="${q.id}" data-has-project="">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-xs font-semibold text-gray-700">¿Has desarrollado proyectos?</span>
-                <button type="button" class="sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-teal-100 hover:bg-teal-50" data-q-id="${q.id}">Sí</button>
+                <button type="button" class="sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-blue-100 hover:bg-blue-50" data-q-id="${q.id}">Sí</button>
                 <button type="button" class="sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50" data-q-id="${q.id}">No</button>
               </div>
               <div class="sim-proj-list space-y-2 hidden" data-q-id="${q.id}">
                 ${rowsHtml}
               </div>
-              <button type="button" class="sim-proj-add hidden inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-600 hover:text-teal-700 mt-1" data-q-id="${q.id}">
-                <i class="fa-solid fa-plus"></i> Agregar proyecto
+              <button type="button" class="sim-proj-add hidden inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 mt-1" data-q-id="${q.id}">
+                <i class="fa-solid fa-plus"></i> Agregar otro proyecto
               </button>
             </div>
           `;
@@ -1546,8 +1547,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const yesBtn = block.querySelector('.sim-proj-yes');
         const noBtn = block.querySelector('.sim-proj-no');
         yesBtn.className = choice === 'yes'
-          ? 'sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-teal-500 text-white border-teal-500 shadow-sm'
-          : 'sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-teal-100 hover:bg-teal-50';
+          ? 'sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-blue-500 text-white border-blue-500 shadow-sm'
+          : 'sim-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-blue-100 hover:bg-blue-50';
         noBtn.className = choice === 'no'
           ? 'sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-slate-600 text-white border-slate-600 shadow-sm'
           : 'sim-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50';
@@ -2415,6 +2416,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const ans = simAnswers[q.id];
           let statusBadge = "";
           let comparisonDetails = "";
+          let simProgrammingSimilarity = null;
 
           if (q.type === 'short') {
             statusBadge = `
@@ -2447,8 +2449,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               comparisonDetails = projects.map((project, pIdx) => {
                 const linkUrl = normalizeUrl(project.link);
                 return `
-                  <div class="mt-2 bg-teal-50/40 p-2.5 rounded-xl border border-teal-100 space-y-1">
-                    <span class="text-[9px] font-bold text-teal-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
+                  <div class="mt-2 bg-blue-50/40 p-2.5 rounded-xl border border-blue-100 space-y-1">
+                    <span class="text-[9px] font-bold text-blue-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
                     <p class="text-xs text-gray-600"><strong>Descripción:</strong> ${escapeHTML(project.description || "Sin respuesta")}</p>
                     <p class="text-xs text-gray-600"><strong>Link:</strong> ${linkUrl ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline break-all">${escapeHTML(project.link)}</a>` : escapeHTML(project.link || "Sin respuesta")}</p>
                     <p class="text-xs text-gray-600"><strong>Tecnologías:</strong> ${escapeHTML(project.technologies || "Sin respuesta")}</p>
@@ -2496,21 +2498,55 @@ document.addEventListener('DOMContentLoaded', async () => {
                   const cssMatch = ans.css && ans.css.trim() === (q.correct || "").trim();
 
                   isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(ans) === String(q.correct));
+
+                  const expectedCode = String(q.correct || '').trim();
+                  const candidateCodes = [ans.sql, ans.js, ans.html, ans.css, ans.compiledOutput]
+                    .filter(c => c && String(c).trim());
+                  if (expectedCode && candidateCodes.length) {
+                    simProgrammingSimilarity = Math.max(...candidateCodes.map(c => window.calculateCodeSimilarity(expectedCode, c)));
+                  } else if (expectedCode || candidateCodes.length) {
+                    simProgrammingSimilarity = 0;
+                  }
                 } else if (ans) {
                   isCorrect = (String(ans).trim() === String(q.correct || "").trim());
                 }
 
-                const userRepr = ans && typeof ans === 'object' ? (ans.compiledOutput || ans.sql || ans.js || ans.html || "") : String(ans || "");
+                const fullCodeParts = [];
+                if (ans && typeof ans === 'object') {
+                  if (ans.html) fullCodeParts.push(`HTML:\n${ans.html}`);
+                  if (ans.css) fullCodeParts.push(`CSS:\n${ans.css}`);
+                  if (ans.js) fullCodeParts.push(`JS:\n${ans.js}`);
+                  if (ans.sql) fullCodeParts.push(`SQL:\n${ans.sql}`);
+                }
+                const fullCode = fullCodeParts.join('\n\n');
+                const similarityValue = simProgrammingSimilarity ?? 0;
                 comparisonDetails = `
-                  <p class="text-xs text-gray-600 mt-1"><strong>Tu output o código:</strong></p>
-                  <pre class="bg-slate-900 text-slate-300 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(userRepr || "Sin output compilado")}</pre>
-                  <p class="text-xs text-gray-600 mt-1"><strong>Output o código correcto esperado:</strong></p>
+                  <div class="mt-2 bg-indigo-50 p-2.5 rounded-xl border border-indigo-100">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Similitud de sintaxis</span>
+                      <span class="text-sm font-extrabold text-indigo-700">${similarityValue}%</span>
+                    </div>
+                    <div class="w-full bg-indigo-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                      <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${similarityValue}%"></div>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-600 mt-1"><strong>Tu código:</strong></p>
+                  <pre class="bg-slate-900 text-slate-300 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(fullCode || "Sin código")}</pre>
+                  <p class="text-xs text-gray-600 mt-1"><strong>Código correcto esperado:</strong></p>
                   <pre class="bg-slate-900 text-emerald-400 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(q.correct)}</pre>
                 `;
               }
             }
 
-            if (isCorrect) {
+            const isIdeCode = q.type === 'programacion' && (q.responseType || 'ide') === 'ide';
+            if (isIdeCode) {
+              if (isCorrect) correctCount++;
+              statusBadge = `
+                <span class="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                  <i class="fa-solid fa-code"></i> Similitud ${simProgrammingSimilarity ?? 0}%
+                </span>
+              `;
+            } else if (isCorrect) {
               correctCount++;
               statusBadge = `
                 <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
