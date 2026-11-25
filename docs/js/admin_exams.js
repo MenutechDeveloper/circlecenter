@@ -525,7 +525,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     });
 
-    // Bind Edit/Delete
+    // Bind Edit/Sync/Delete
     document.querySelectorAll('.edit-exam-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
