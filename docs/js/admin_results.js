@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       let badgeColor = res.max_score > 0
         ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-        : "bg-teal-50 text-teal-700 border border-teal-100";
+        : "bg-blue-50 text-blue-700 border border-blue-100";
       if (res.max_score > 0) {
         if (scorePercent < 60) badgeColor = "bg-rose-50 text-rose-700 border border-rose-100";
         else if (scorePercent < 80) badgeColor = "bg-amber-50 text-amber-700 border border-amber-100";
@@ -292,6 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       part.questions.forEach((q, idx) => {
         const hasCorrect = q.type !== 'short' && q.type !== 'canvas' && q.type !== 'proyectos';
         let isCorrect = hasCorrect && (q.userAnswer === q.correct);
+        let programmingSimilarity = null;
         if (q.type === 'programacion') {
           const respType = q.responseType || 'ide';
           if (respType === 'multiple' || respType === 'short') {
@@ -307,6 +308,15 @@ document.addEventListener('DOMContentLoaded', async () => {
               const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
 
               isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
+
+              const expectedCode = String(q.correct || '').trim();
+              const candidateCodes = [ansObj.sql, ansObj.js, ansObj.html, ansObj.css, ansObj.compiledOutput]
+                .filter(c => c && String(c).trim());
+              if (expectedCode && candidateCodes.length) {
+                programmingSimilarity = Math.max(...candidateCodes.map(c => window.calculateCodeSimilarity(expectedCode, c)));
+              } else if (expectedCode || candidateCodes.length) {
+                programmingSimilarity = 0;
+              }
             } else {
               isCorrect = false;
             }
@@ -315,11 +325,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let badge = "";
         if (q.type === 'proyectos') {
-          badge = `<span class="text-[9px] font-bold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-100"><i class="fa-solid fa-folder-open text-teal-500"></i> Proyectos</span>`;
+          badge = `<span class="text-[9px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100"><i class="fa-solid fa-folder-open text-blue-500"></i> Proyectos</span>`;
         } else if (q.type === 'canvas') {
           badge = `<span class="text-[9px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-100"><i class="fa-solid fa-palette text-purple-500"></i> Diseño Canvas</span>`;
         } else if (q.type === 'programacion') {
-          badge = `<span class="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100"><i class="fa-solid fa-code text-indigo-500"></i> Programación</span> ${isCorrect ? '<span class="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-check"></i> Correcto</span>' : '<span class="text-[9px] font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100"><i class="fa-solid fa-xmark"></i> Incorrecto</span>'}`;
+          const isIde = (q.responseType || 'ide') === 'ide';
+          const similarityBadge = isIde
+            ? `<span class="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100"><i class="fa-solid fa-code"></i> Similitud ${programmingSimilarity ?? 0}%</span>`
+            : (isCorrect
+              ? '<span class="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-check"></i> Correcto</span>'
+              : '<span class="text-[9px] font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100"><i class="fa-solid fa-xmark"></i> Incorrecto</span>');
+          badge = `<span class="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100"><i class="fa-solid fa-code text-indigo-500"></i> Programación</span> ${similarityBadge}`;
         } else if (hasCorrect) {
           badge = isCorrect
             ? `<span class="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-check"></i> Correcto</span>`
@@ -341,13 +357,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           if (raw.hasProject === false) {
             answerWidget = `
-              <div class="col-span-2 mt-1 bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs font-semibold text-gray-600">
+              <div class="col-span-2 mt-1 bg-blue-50/40 p-3 rounded-xl border border-blue-100 text-xs font-semibold text-gray-600">
                 No ha desarrollado proyectos.
               </div>
             `;
           } else if (projects.length === 0) {
             answerWidget = `
-              <div class="col-span-2 mt-1 bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs font-semibold text-gray-400">
+              <div class="col-span-2 mt-1 bg-blue-50/40 p-3 rounded-xl border border-blue-100 text-xs font-semibold text-gray-400">
                 Sin responder
               </div>
             `;
@@ -357,21 +373,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${projects.map((project, pIdx) => {
                   const linkUrl = normalizeUrl(project.link);
                   return `
-                    <div class="bg-teal-50/40 p-3 rounded-xl border border-teal-100 text-xs space-y-2">
-                      <span class="text-[9px] font-bold text-teal-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
+                    <div class="bg-blue-50/40 p-3 rounded-xl border border-blue-100 text-xs space-y-2">
+                      <span class="text-[9px] font-bold text-blue-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
                       <div>
-                        <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Descripción</strong>
+                        <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">Descripción</strong>
                         <span class="font-medium text-gray-700 whitespace-pre-wrap">${escapeHTML(project.description || 'Sin responder')}</span>
                       </div>
                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
-                          <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Link</strong>
+                          <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">Link</strong>
                           ${linkUrl
                             ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-600 hover:text-blue-700 underline break-all inline-flex items-center gap-1"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>${escapeHTML(project.link)}</a>`
                             : `<span class="font-medium text-gray-400">${escapeHTML(project.link || 'Sin responder')}</span>`}
                         </div>
                         <div>
-                          <strong class="text-[9px] text-teal-500 block uppercase tracking-wide">Tecnologías / Frameworks</strong>
+                          <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">Tecnologías / Frameworks</strong>
                           <span class="font-medium text-gray-700">${escapeHTML(project.technologies || 'Sin responder')}</span>
                         </div>
                       </div>
@@ -426,8 +442,18 @@ document.addEventListener('DOMContentLoaded', async () => {
               if (ansObj.sql) codeParts.push(`SQL:\n${ansObj.sql}`);
 
               const fullCode = codeParts.join('\n\n');
+              const similarityValue = programmingSimilarity ?? 0;
               answerWidget = `
                 <div class="col-span-2 space-y-2 mt-1">
+                  <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Similitud de sintaxis</span>
+                      <span class="text-lg font-extrabold text-indigo-700">${similarityValue}%</span>
+                    </div>
+                    <div class="w-full bg-indigo-100 rounded-full h-2 mt-2 overflow-hidden">
+                      <div class="bg-indigo-500 h-2 rounded-full" style="width: ${similarityValue}%"></div>
+                    </div>
+                  </div>
                   <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-white font-mono text-xs shadow-inner">
                     <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Código Escrito por el Candidato</span>
                     <pre class="overflow-x-auto max-h-48 whitespace-pre-wrap custom-scroll text-sky-300">${escapeHTML(fullCode || 'Sin código')}</pre>
@@ -437,7 +463,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <pre class="overflow-x-auto max-h-32 whitespace-pre-wrap custom-scroll">${escapeHTML(ansObj.compiledOutput || 'Sin compilar')}</pre>
                   </div>
                   <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs col-span-2">
-                    <strong class="text-[8px] text-gray-400 block uppercase">Clave/Resultado Esperado por el Reclutador</strong>
+                    <strong class="text-[8px] text-gray-400 block uppercase">Código / Resultado Esperado por el Reclutador</strong>
                     <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin resultado esperado')}</pre>
                   </div>
                 </div>

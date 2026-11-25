@@ -218,9 +218,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function projectRowHtml(qId, project = {}) {
     return `
       <div class="tech-proj-row grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
-        <textarea rows="1" class="tech-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none resize-y" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
-        <input type="url" class="tech-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
-        <input type="text" class="tech-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-teal-100 text-xs focus:ring-2 focus:ring-teal-300 focus:outline-none" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
+        <textarea rows="1" class="tech-proj-description md:col-span-5 w-full min-h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none resize-y" placeholder="Descripción" data-q-id="${qId}">${escapeHTML(project.description || '')}</textarea>
+        <input type="url" class="tech-proj-link md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none" placeholder="Link" data-q-id="${qId}" value="${escapeHTML(project.link || '')}">
+        <input type="text" class="tech-proj-tech md:col-span-3 w-full h-[38px] px-3 py-2 rounded-xl border border-blue-100 text-xs focus:ring-2 focus:ring-blue-300 focus:outline-none" placeholder="Tecnologías / Frameworks" data-q-id="${qId}" value="${escapeHTML(project.technologies || '')}">
         <button type="button" class="tech-proj-remove md:col-span-1 w-9 h-[38px] rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center justify-self-end md:justify-self-auto transition" title="Quitar proyecto">
           <i class="fa-solid fa-xmark text-xs"></i>
         </button>
@@ -506,14 +506,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="mt-2 space-y-2 tech-proj-block" data-q-id="${q.id}" data-has-project="${isYes ? 'true' : isNo ? 'false' : ''}">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-xs font-semibold text-gray-700">¿Has desarrollado proyectos?</span>
-                <button type="button" class="tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isYes ? 'bg-teal-500 text-white border-teal-500 shadow-sm' : 'bg-white text-gray-600 border-teal-100 hover:bg-teal-50'}" data-q-id="${q.id}">Sí</button>
+                <button type="button" class="tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isYes ? 'bg-blue-500 text-white border-blue-500 shadow-sm' : 'bg-white text-gray-600 border-blue-100 hover:bg-blue-50'}" data-q-id="${q.id}">Sí</button>
                 <button type="button" class="tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition ${isNo ? 'bg-slate-600 text-white border-slate-600 shadow-sm' : 'bg-white text-gray-600 border-slate-200 hover:bg-slate-50'}" data-q-id="${q.id}">No</button>
               </div>
               <div class="tech-proj-list space-y-2 ${isYes ? '' : 'hidden'}" data-q-id="${q.id}">
                 ${rowsHtml}
               </div>
-              <button type="button" class="tech-proj-add ${isYes ? '' : 'hidden'} inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-600 hover:text-teal-700 mt-1" data-q-id="${q.id}">
-                <i class="fa-solid fa-plus"></i> Agregar proyecto
+              <button type="button" class="tech-proj-add ${isYes ? '' : 'hidden'} inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 mt-1" data-q-id="${q.id}">
+                <i class="fa-solid fa-plus"></i> Agregar otro proyecto
               </button>
             </div>
           `;
@@ -874,8 +874,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         block.setAttribute('data-has-project', choice === 'yes' ? 'true' : 'false');
         const yesBtn = block.querySelector('.tech-proj-yes');
         const noBtn = block.querySelector('.tech-proj-no');
-        const yesActive = 'tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-teal-500 text-white border-teal-500 shadow-sm';
-        const yesInactive = 'tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-teal-100 hover:bg-teal-50';
+        const yesActive = 'tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-blue-500 text-white border-blue-500 shadow-sm';
+        const yesInactive = 'tech-proj-yes px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-blue-100 hover:bg-blue-50';
         const noActive = 'tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-slate-600 text-white border-slate-600 shadow-sm';
         const noInactive = 'tech-proj-no px-3 py-1 rounded-lg border text-[11px] font-bold transition bg-white text-gray-600 border-slate-200 hover:bg-slate-50';
         yesBtn.className = choice === 'yes' ? yesActive : yesInactive;
