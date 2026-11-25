@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Estado Local
   let allExams = [];
+  let autoSyncPromise = Promise.resolve();
   let currentExamId = null; // null si es nuevo examen
   let partsData = []; // [{ id, title, questions: [] }]
   let lastActivePartIdx = 0; // Índice de la sección activa para añadir modos especiales
@@ -251,6 +252,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function syncExamCorrectAnswersToResults(parts) {
     return syncCorrectAnswersToResults(getCorrectAnswerMap(parts));
+  }
+
+  async function syncAllExamKeysToResultsSilently() {
+    const correctByKey = new Map();
+    const conflicts = new Set();
+    allExams.filter(exam => !exam.is_psychometric).forEach(exam => {
+      (exam.parts || []).forEach(part => {
+        (part.questions || []).forEach(q => {
+          const key = resultQuestionKey(q);
+          if (!key) return;
+          if (correctByKey.has(key) && String(correctByKey.get(key) ?? '') !== String(q.correct ?? '')) {
+            conflicts.add(key);
+          } else {
+            correctByKey.set(key, q.correct);
+          }
+        });
+      });
+    });
+    conflicts.forEach(key => correctByKey.delete(key));
+    if (correctByKey.size === 0) return;
+    try {
+      const result = await syncCorrectAnswersToResults(correctByKey);
+      if (result.updated > 0) {
+        console.log(`Sincronización automática de claves: ${result.updated} reportes actualizados.`);
+      }
+    } catch (err) {
+      console.error('No se pudo sincronizar automáticamente las claves con los reportes:', err);
+    }
   }
 
   function getQuestionText(q) {
@@ -535,6 +564,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
         try {
+          await autoSyncPromise;
           const result = await syncExamCorrectAnswersToResults(exam.parts || []);
           showPastelAlert(result.updated > 0
             ? `Se actualizaron ${result.updated} reportes con la clave actual del examen.`
@@ -1432,6 +1462,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (existingExam) {
           try {
+            await autoSyncPromise;
             const sync = await syncExamCorrectAnswersToResults(partsData);
             if (sync.failed > 0) {
               console.warn(`Se sincronizaron ${sync.updated} resultados; ${sync.failed} fallaron.`);
@@ -2684,4 +2715,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar
   await loadExams();
   goToStep(1);
+  autoSyncPromise = syncAllExamKeysToResultsSilently();
 });
