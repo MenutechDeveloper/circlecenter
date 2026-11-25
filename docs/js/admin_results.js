@@ -258,17 +258,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function renderAIDetector(report) {
-    if (!modalAIDetector) return;
+  function examOrderRank(name) {
+    const t = String(name || '').toLowerCase();
+    if (t.includes('acerca')) return 0;
+    if (t.includes('program')) return 1;
+    return 2;
+  }
 
+  function buildAIDetectorHtml(report) {
     const ai = report.ai_metrics;
-    const exams = ai && Array.isArray(ai.exams) ? ai.exams.filter(Boolean) : [];
+    const exams = (ai && Array.isArray(ai.exams) ? ai.exams.filter(Boolean) : [])
+      .sort((a, b) => examOrderRank(a.examName) - examOrderRank(b.examName));
 
-    if (!ai || !ai.enabled || exams.length === 0) {
-      modalAIDetector.classList.add('hidden');
-      modalAIDetector.innerHTML = '';
-      return;
-    }
+    if (!ai || !ai.enabled || exams.length === 0) return '';
 
     let html = '';
 
@@ -345,6 +347,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     });
 
+    return html;
+  }
+
+  function renderAIDetector(report) {
+    if (!modalAIDetector) return;
+    const html = buildAIDetectorHtml(report);
+    if (!html) {
+      modalAIDetector.classList.add('hidden');
+      modalAIDetector.innerHTML = '';
+      return;
+    }
     modalAIDetector.innerHTML = html;
     modalAIDetector.classList.remove('hidden');
   }
@@ -433,7 +446,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Renderizar secciones de examen
     renderAnswers(modalAnswersPsy, report.psychometric_answers);
-    renderAnswers(modalAnswersTech, report.technical_answers, { editable: true });
+    renderAnswers(modalAnswersTech, report.technical_answers);
 
     // Resetear Tabs
     modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
@@ -444,16 +457,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     resultModal.classList.remove('hidden');
   }
 
-  function renderAnswers(container, answersData, options = {}) {
-    const editable = !!options.editable;
+  function renderAnswers(container, answersData) {
     container.innerHTML = "";
-    const parts = (answersData && answersData.parts) || [];
+    const parts = [...((answersData && answersData.parts) || [])].sort((a, b) => examOrderRank(a.title) - examOrderRank(b.title));
     if (parts.length === 0) {
       container.innerHTML = `<div class="text-center py-4 text-gray-400 text-xs">No hay respuestas cargadas para este bloque.</div>`;
       return;
     }
 
-    parts.forEach((part, partIdx) => {
+    parts.forEach(part => {
       const partTitle = part.title && String(part.title).trim() ? part.title : 'Preguntas';
       let partHtml = `
         <div class="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50 space-y-3">
@@ -516,12 +528,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           badge = `<span class="text-[9px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">Abierta</span>`;
         }
-
-        const editButton = editable ? `
-          <button type="button" class="edit-correct-btn text-[9px] font-bold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-100 px-2 py-0.5 rounded-full transition" data-part-idx="${partIdx}" data-q-idx="${idx}">
-            <i class="fa-solid fa-pen mr-1"></i>Editar clave
-          </button>
-        ` : '';
 
         let answerWidget = "";
         if (q.type === 'proyectos') {
@@ -621,15 +627,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <span class="text-[9px] font-bold text-amber-700 uppercase tracking-wider block mb-2">Código del candidato</span>
                     <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(candidateCode || 'Sin código')}</pre>
                   </div>
-                  <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3" data-correct-wrap data-part-idx="${partIdx}" data-q-idx="${idx}">
-                    <div class="flex items-center justify-between gap-2 mb-2">
-                      <span class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider block">Código correcto</span>
-                      ${editButton}
-                    </div>
-                    <div data-correct-display>
-                      <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(q.correct || 'Sin código')}</pre>
-                    </div>
-                    <div data-correct-editor class="hidden mt-2"></div>
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3">
+                    <span class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider block mb-2">Código correcto</span>
+                    <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(q.correct || 'Sin código')}</pre>
                   </div>
                 </div>
               </div>
@@ -641,15 +641,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <strong class="text-[8px] text-gray-400 block uppercase">Respuesta del Aspirante (${respType === 'multiple' ? 'Opción Múltiple' : 'Respuesta Corta'})</strong>
                   <span class="font-medium text-blue-900 whitespace-pre-wrap">${escapeHTML(q.userAnswer || 'Sin responder')}</span>
                 </div>
-                <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs" data-correct-wrap data-part-idx="${partIdx}" data-q-idx="${idx}">
-                  <div class="flex items-center justify-between gap-2">
-                    <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
-                    ${editButton}
-                  </div>
-                  <div data-correct-display>
-                    <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin solución esperada')}</pre>
-                  </div>
-                  <div data-correct-editor class="hidden mt-2"></div>
+                <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs">
+                  <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
+                  <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin solución esperada')}</pre>
                 </div>
               </div>
             `;
@@ -661,22 +655,16 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span class="font-medium text-blue-900">${q.userAnswer || '<em class="text-gray-300">Sin responder</em>'}</span>
             </div>
             ${hasCorrect ? `
-              <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10" data-correct-wrap data-part-idx="${partIdx}" data-q-idx="${idx}">
-                <div class="flex items-center justify-between gap-2">
-                  <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
-                  ${editButton}
-                </div>
-                <div data-correct-display>
-                  <span class="font-medium text-emerald-950">${escapeHTML(q.correct)}</span>
-                </div>
-                <div data-correct-editor class="hidden mt-2"></div>
+              <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10">
+                <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
+                <span class="font-medium text-emerald-950">${escapeHTML(q.correct)}</span>
               </div>
             ` : ''}
           `;
         }
 
         partHtml += `
-          <div class="pdf-question pt-2 space-y-1" data-part-idx="${partIdx}" data-q-idx="${idx}">
+          <div class="pdf-question pt-2 space-y-1">
             <div class="flex justify-between items-start gap-4">
               <span class="text-xs font-bold text-gray-700 whitespace-pre-wrap" style="white-space: pre-wrap;">${idx + 1}. ${escapeHTML(getQuestionText(q) || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : 'Pregunta'))}</span>
               ${badge}
@@ -695,197 +683,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       container.innerHTML += partHtml;
     });
   }
-
-  function openCorrectEditor(btn) {
-    if (!activeReport) return;
-    const partIdx = Number(btn.dataset.partIdx);
-    const qIdx = Number(btn.dataset.qIdx);
-    const q = activeReport.technical_answers &&
-      activeReport.technical_answers.parts &&
-      activeReport.technical_answers.parts[partIdx] &&
-      activeReport.technical_answers.parts[partIdx].questions
-      ? activeReport.technical_answers.parts[partIdx].questions[qIdx]
-      : null;
-    if (!q) return;
-
-    const wrap = btn.closest('[data-correct-wrap]');
-    if (!wrap) return;
-    const display = wrap.querySelector('[data-correct-display]');
-    const editor = wrap.querySelector('[data-correct-editor]');
-    if (!display || !editor || !editor.classList.contains('hidden')) return;
-
-    modalAnswersTech.querySelectorAll('[data-correct-editor]:not(.hidden)').forEach(openEditor => {
-      openEditor.classList.add('hidden');
-      openEditor.innerHTML = '';
-      const openWrap = openEditor.closest('[data-correct-wrap]');
-      const openDisplay = openWrap ? openWrap.querySelector('[data-correct-display]') : null;
-      if (openDisplay) openDisplay.classList.remove('hidden');
-    });
-
-    const respType = q.type === 'programacion'
-      ? (q.responseType === 'multiple' || q.responseType === 'short' ? q.responseType : 'code')
-      : null;
-
-    let inputHtml = '';
-    if (q.type === 'multiple' || (q.type === 'programacion' && respType === 'multiple')) {
-      const options = (Array.isArray(q.options) ? q.options : [])
-        .filter(opt => opt !== undefined && opt !== null && String(opt).trim() !== '');
-      inputHtml = options.length > 0
-        ? `
-          <select data-correct-input class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
-            <option value="">Selecciona la correcta...</option>
-            ${options.map(opt => `<option value="${escapeHTML(opt)}" ${String(opt) === String(q.correct) ? 'selected' : ''}>${escapeHTML(opt)}</option>`).join('')}
-          </select>
-        `
-        : `
-          <input data-correct-input type="text" value="${escapeHTML(q.correct || '')}" class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300" placeholder="Escribe la respuesta correcta...">
-        `;
-    } else if (q.type === 'boolean') {
-      inputHtml = `
-        <select data-correct-input class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
-          <option value="Verdadero" ${q.correct === 'Verdadero' ? 'selected' : ''}>Verdadero</option>
-          <option value="Falso" ${q.correct === 'Falso' ? 'selected' : ''}>Falso</option>
-        </select>
-      `;
-    } else if (q.type === 'programacion' && respType === 'code') {
-      inputHtml = `
-        <textarea data-correct-input rows="7" class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-violet-50/30 text-slate-800 font-mono resize-y custom-scroll focus:outline-none focus:ring-1 focus:ring-violet-300">${escapeHTML(q.correct || '')}</textarea>
-      `;
-    } else if (q.type === 'programacion' && respType === 'short') {
-      inputHtml = `
-        <input data-correct-input type="text" value="${escapeHTML(q.correct || '')}" class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
-      `;
-    } else {
-      return;
-    }
-
-    editor.innerHTML = `
-      <div class="space-y-2">
-        ${inputHtml}
-        <div class="flex items-center justify-end gap-2">
-          <button type="button" class="cancel-correct-btn px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold text-[10px] transition">Cancelar</button>
-          <button type="button" class="save-correct-btn px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-[10px] transition" data-part-idx="${partIdx}" data-q-idx="${qIdx}">
-            <i class="fa-solid fa-check mr-1"></i>Guardar
-          </button>
-        </div>
-      </div>
-    `;
-    display.classList.add('hidden');
-    editor.classList.remove('hidden');
-    const input = editor.querySelector('[data-correct-input]');
-    if (input) input.focus();
-  }
-
-  function cancelCorrectEditor(btn) {
-    const wrap = btn.closest('[data-correct-wrap]');
-    if (!wrap) return;
-    const display = wrap.querySelector('[data-correct-display]');
-    const editor = wrap.querySelector('[data-correct-editor]');
-    if (display) display.classList.remove('hidden');
-    if (editor) {
-      editor.classList.add('hidden');
-      editor.innerHTML = '';
-    }
-  }
-
-  function refreshActiveReport() {
-    if (!activeReport) return;
-    const score = calculateTechnicalScore(activeReport.technical_answers);
-    if (score.total > 0) {
-      modalCandScore.textContent = `${score.correct} bien, ${score.incorrect} mal, ${score.empty} vacías de ${score.total}`;
-      modalCandPercentage.textContent = `${score.scorePct}%`;
-    } else {
-      modalCandScore.textContent = "Evaluación cualitativa";
-      modalCandPercentage.textContent = "—";
-    }
-    renderAnswers(modalAnswersPsy, activeReport.psychometric_answers);
-    renderAnswers(modalAnswersTech, activeReport.technical_answers, { editable: true });
-    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
-    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
-    modalAnswersTech.classList.remove('hidden');
-    modalAnswersPsy.classList.add('hidden');
-  }
-
-  async function saveCorrectAnswer(btn) {
-    if (!activeReport) return;
-    const partIdx = Number(btn.dataset.partIdx);
-    const qIdx = Number(btn.dataset.qIdx);
-    const part = activeReport.technical_answers &&
-      activeReport.technical_answers.parts &&
-      activeReport.technical_answers.parts[partIdx];
-    const q = part && part.questions ? part.questions[qIdx] : null;
-    if (!q) return;
-
-    const wrap = btn.closest('[data-correct-wrap]');
-    const input = wrap ? wrap.querySelector('[data-correct-input]') : null;
-    if (!input) return;
-
-    const newValue = typeof input.value === 'string' ? input.value.trim() : '';
-    if (!newValue) {
-      showPastelAlert('La respuesta correcta no puede estar vacía.');
-      return;
-    }
-    if (String(newValue) === String(q.correct || '')) {
-      cancelCorrectEditor(btn);
-      return;
-    }
-
-    const originalValue = q.correct;
-    const originalScore = activeReport.score;
-    const originalMaxScore = activeReport.max_score;
-    q.correct = newValue;
-    const score = calculateTechnicalScore(activeReport.technical_answers);
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Guardando...';
-
-    try {
-      const { error } = await supabaseClient
-        .from('results')
-        .update({
-          technical_answers: activeReport.technical_answers,
-          score: score.correct,
-          max_score: score.total
-        })
-        .eq('id', activeReport.id);
-      if (error) throw error;
-
-      activeReport.score = score.correct;
-      activeReport.max_score = score.total;
-      refreshActiveReport();
-      renderResults();
-    } catch (err) {
-      q.correct = originalValue;
-      activeReport.score = originalScore;
-      activeReport.max_score = originalMaxScore;
-      console.error(err);
-      showPastelAlert('No se pudo guardar la corrección: ' + err.message);
-      cancelCorrectEditor(btn);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Guardar';
-    }
-  }
-
-  modalAnswersTech.addEventListener('click', (event) => {
-    const editBtn = event.target.closest('.edit-correct-btn');
-    if (editBtn) {
-      event.preventDefault();
-      openCorrectEditor(editBtn);
-      return;
-    }
-    const saveBtn = event.target.closest('.save-correct-btn');
-    if (saveBtn) {
-      event.preventDefault();
-      saveCorrectAnswer(saveBtn);
-      return;
-    }
-    const cancelBtn = event.target.closest('.cancel-correct-btn');
-    if (cancelBtn) {
-      event.preventDefault();
-      cancelCorrectEditor(cancelBtn);
-    }
-  });
 
   // Acción de asignar examen adicional en cualquier momento
   const assignExtraBtn = document.getElementById('modal-btn-assign-extra');
@@ -948,6 +745,115 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('#modal-ai-detector details').forEach(details => { details.open = true; });
   });
 
+  function buildPDFReport(report) {
+    const score = calculateTechnicalScore(report.technical_answers);
+
+    const pdfRoot = document.createElement('div');
+    pdfRoot.className = 'pdf-report bg-white';
+    pdfRoot.style.cssText = 'width:700px;margin:0 auto;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;color:#1f2937;';
+
+    const header = document.createElement('div');
+    header.className = 'bg-blue-400 p-6 text-white';
+    header.innerHTML = `
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+          <i class="fa-solid fa-id-card text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold">${escapeHTML(report.candidate_name || 'Candidato')}</h1>
+          <p class="text-xs text-blue-100">Vacante de Interés: ${escapeHTML(report.assigned_exam_name || 'General')}</p>
+        </div>
+      </div>
+    `;
+    pdfRoot.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'p-6 space-y-6';
+
+    const scoreCard = document.createElement('div');
+    scoreCard.className = 'bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between pdf-avoid-break';
+    scoreCard.innerHTML = `
+      <div>
+        <span class="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block">Calificaciones</span>
+        <span class="text-lg font-bold text-gray-800">${score.total > 0 ? `${score.correct} bien, ${score.incorrect} mal, ${score.empty} vacías de ${score.total}` : 'Evaluación cualitativa'}</span>
+      </div>
+      <div class="text-xs font-extrabold bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full">${score.total > 0 ? `${score.scorePct}%` : '—'}</div>
+    `;
+    body.appendChild(scoreCard);
+
+    const info = report.candidate_info || {};
+    const infoKeys = Object.keys(info);
+    const infoCard = document.createElement('div');
+    infoCard.className = 'bg-gray-50 p-4 rounded-2xl border border-gray-100 pdf-avoid-break';
+    infoCard.innerHTML = `
+      <h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> Información del Candidato</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600">
+        ${infoKeys.length === 0
+          ? '<span class="text-gray-400 col-span-2">No se capturó información adicional de formulario.</span>'
+          : infoKeys.map(key => `
+              <div class="bg-white p-2 rounded-xl border border-blue-50 shadow-sm">
+                <strong class="text-[9px] text-blue-400 uppercase block">${escapeHTML(key.replace(/_/g, ' ').toUpperCase())}</strong>
+                <span class="text-xs font-semibold text-gray-700">${escapeHTML(String(info[key] ?? ''))}</span>
+              </div>
+            `).join('')}
+      </div>
+    `;
+    body.appendChild(infoCard);
+
+    const techSection = document.createElement('section');
+    techSection.className = 'pdf-section';
+    techSection.innerHTML = '<h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-laptop-code mr-1 text-blue-400"></i> Respuestas de los Exámenes</h2>';
+    const techContainer = document.createElement('div');
+    techContainer.className = 'space-y-3';
+    renderAnswers(techContainer, report.technical_answers);
+    techSection.appendChild(techContainer);
+    body.appendChild(techSection);
+
+    const psyParts = (report.psychometric_answers && report.psychometric_answers.parts) || [];
+    if (psyParts.length > 0) {
+      const psySection = document.createElement('section');
+      psySection.className = 'pdf-section';
+      psySection.innerHTML = '<h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-brain mr-1 text-blue-400"></i> Respuestas Psicométricas</h2>';
+      const psyContainer = document.createElement('div');
+      psyContainer.className = 'space-y-3';
+      renderAnswers(psyContainer, report.psychometric_answers);
+      psySection.appendChild(psyContainer);
+      body.appendChild(psySection);
+    }
+
+    const aiHtml = buildAIDetectorHtml(report);
+    if (aiHtml) {
+      const aiSection = document.createElement('section');
+      aiSection.className = 'pdf-section';
+      aiSection.innerHTML = '<h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-file-shield mr-1 text-violet-500"></i> Detector de IA</h2>';
+      const aiContainer = document.createElement('div');
+      aiContainer.className = 'space-y-2';
+      aiContainer.innerHTML = aiHtml;
+      aiSection.appendChild(aiContainer);
+      body.appendChild(aiSection);
+    }
+
+    pdfRoot.appendChild(body);
+
+    const pdfFooter = document.createElement('div');
+    pdfFooter.className = 'px-6 py-4 border-t border-gray-100 text-center text-[10px] text-gray-400';
+    pdfFooter.textContent = `Reporte generado el ${new Date().toLocaleString('es-MX')} · CircleCenter`;
+    pdfRoot.appendChild(pdfFooter);
+
+    pdfRoot.querySelectorAll('details').forEach(details => { details.open = true; });
+
+    const pdfStyle = document.createElement('style');
+    pdfStyle.textContent = `
+      .pdf-report [class*="max-h-"] { max-height: none !important; }
+      .pdf-report [class*="overflow-"] { overflow: visible !important; }
+      .pdf-report .pdf-avoid-break,
+      .pdf-report .pdf-question { break-inside: avoid; }
+    `;
+    pdfRoot.appendChild(pdfStyle);
+
+    return pdfRoot;
+  }
+
   modalPrintBtn.addEventListener('click', async () => {
     if (!activeReport) return;
     const originalHtml = modalPrintBtn.innerHTML;
@@ -958,65 +864,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       if (typeof html2pdf === 'undefined') throw new Error('html2pdf no está disponible');
 
-      const modalContent = document.querySelector('#result-modal > div');
-      if (!modalContent) throw new Error('No se encontró el reporte');
-
-      const clone = modalContent.cloneNode(true);
-      clone.classList.add('pdf-report');
-      clone.querySelectorAll('#modal-footer, #modal-tabs, #modal-assign-extra-section, #modal-close-btn, .edit-correct-btn').forEach(el => el.remove());
-      clone.querySelectorAll('[data-correct-editor]').forEach(el => el.remove());
-      clone.querySelectorAll('[data-correct-display]').forEach(el => el.classList.remove('hidden'));
-
-      const psy = clone.querySelector('#modal-answers-psy');
-      const tech = clone.querySelector('#modal-answers-tech');
-      if (psy) {
-        psy.classList.remove('hidden');
-        const psyTitle = document.createElement('h3');
-        psyTitle.className = 'text-sm font-bold text-gray-700 mt-4 mb-2';
-        psyTitle.textContent = 'Respuestas Psicométricas';
-        psy.parentNode.insertBefore(psyTitle, psy);
-      }
-      if (tech) {
-        tech.classList.remove('hidden');
-        const techTitle = document.createElement('h3');
-        techTitle.className = 'text-sm font-bold text-gray-700 mt-6 mb-2';
-        techTitle.textContent = 'Respuestas de los Exámenes';
-        tech.parentNode.insertBefore(techTitle, tech);
-      }
-
-      clone.querySelectorAll('details').forEach(details => { details.open = true; });
-      clone.querySelectorAll('[class*="max-h-"], [class*="overflow-"]').forEach(el => {
-        el.style.maxHeight = 'none';
-        el.style.overflow = 'visible';
-      });
-      clone.style.maxHeight = 'none';
-      clone.style.overflow = 'hidden';
-      clone.style.display = 'block';
-      const cloneBody = clone.querySelector('.p-6.overflow-y-auto');
-      if (cloneBody) {
-        cloneBody.style.flex = 'none';
-        cloneBody.style.overflow = 'visible';
-        cloneBody.style.maxHeight = 'none';
-      }
-
-      const pdfFooter = document.createElement('div');
-      pdfFooter.className = 'mt-6 pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400';
-      pdfFooter.textContent = `Reporte generado el ${new Date().toLocaleString('es-MX')} · CircleCenter`;
-      clone.appendChild(pdfFooter);
-
-      const pdfStyle = document.createElement('style');
-      pdfStyle.textContent = `
-        .pdf-report .bg-white.rounded-xl,
-        .pdf-report .bg-emerald-50,
-        .pdf-report .pdf-question {
-          break-inside: avoid;
-        }
-      `;
-      clone.appendChild(pdfStyle);
+      const pdfRoot = buildPDFReport(activeReport);
 
       pdfWrapper = document.createElement('div');
-      pdfWrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;background:#ffffff;padding:24px;';
-      pdfWrapper.appendChild(clone);
+      pdfWrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:700px;background:#ffffff;';
+      pdfWrapper.appendChild(pdfRoot);
       document.body.appendChild(pdfWrapper);
 
       const safeName = String(activeReport.candidate_name || 'candidato')
@@ -1028,13 +880,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         margin: [10, 10, 10, 10],
         filename: `reporte_${safeName}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0, windowWidth: 900 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0, windowWidth: 700 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
-      }).from(clone).save();
+      }).from(pdfRoot).save();
     } catch (err) {
       console.error(err);
-      showPastelAlert('No se pudo generar el PDF automáticamente. Se abrirá el diálogo de impresión para guardarlo como PDF.');
       window.print();
     } finally {
       if (pdfWrapper) pdfWrapper.remove();
