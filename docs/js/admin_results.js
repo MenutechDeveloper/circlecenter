@@ -30,6 +30,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   let activeReport = null; // Guardar reporte actual abierto en el modal
   let allAvailableExams = []; // Todos los exámenes disponibles para asignar extra
 
+  const DEFAULT_PROJECT_CONFIG = {
+    yesLabel: "Sí",
+    noLabel: "No",
+    descriptionLabel: "Descripción",
+    linkLabel: "Link",
+    technologiesLabel: "Tecnologías / Frameworks",
+    addLabel: "Agregar otro proyecto"
+  };
+
+  function getProjectConfig(q) {
+    const raw = (q && q.proyectosConfig) || {};
+    const config = {};
+    Object.keys(DEFAULT_PROJECT_CONFIG).forEach(key => {
+      const value = typeof raw[key] === 'string' ? raw[key].trim() : '';
+      config[key] = value || DEFAULT_PROJECT_CONFIG[key];
+    });
+    return config;
+  }
+
   // Cargar resultados
   async function loadResults() {
     if (!supabaseClient) return;
@@ -346,6 +365,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let answerWidget = "";
         if (q.type === 'proyectos') {
+          const cfg = getProjectConfig(q);
           const raw = q.userAnswer && typeof q.userAnswer === 'object' ? q.userAnswer : {};
           let projects = [];
           if (Array.isArray(raw.projects)) {
@@ -358,7 +378,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (raw.hasProject === false) {
             answerWidget = `
               <div class="col-span-2 mt-1 bg-blue-50/40 p-3 rounded-xl border border-blue-100 text-xs font-semibold text-gray-600">
-                No ha desarrollado proyectos.
+                Respuesta: ${escapeHTML(cfg.noLabel)}
               </div>
             `;
           } else if (projects.length === 0) {
@@ -376,18 +396,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="bg-blue-50/40 p-3 rounded-xl border border-blue-100 text-xs space-y-2">
                       <span class="text-[9px] font-bold text-blue-500 uppercase tracking-wide block">Proyecto ${pIdx + 1}</span>
                       <div>
-                        <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">Descripción</strong>
+                        <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">${escapeHTML(cfg.descriptionLabel)}</strong>
                         <span class="font-medium text-gray-700 whitespace-pre-wrap">${escapeHTML(project.description || 'Sin responder')}</span>
                       </div>
                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
-                          <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">Link</strong>
+                          <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">${escapeHTML(cfg.linkLabel)}</strong>
                           ${linkUrl
                             ? `<a href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-600 hover:text-blue-700 underline break-all inline-flex items-center gap-1"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>${escapeHTML(project.link)}</a>`
                             : `<span class="font-medium text-gray-400">${escapeHTML(project.link || 'Sin responder')}</span>`}
                         </div>
                         <div>
-                          <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">Tecnologías / Frameworks</strong>
+                          <strong class="text-[9px] text-blue-500 block uppercase tracking-wide">${escapeHTML(cfg.technologiesLabel)}</strong>
                           <span class="font-medium text-gray-700">${escapeHTML(project.technologies || 'Sin responder')}</span>
                         </div>
                       </div>
@@ -494,7 +514,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         partHtml += `
           <div class="pt-2 space-y-1">
             <div class="flex justify-between items-start gap-4">
-              <span class="text-xs font-bold text-gray-700">${idx + 1}. ${q.type === 'proyectos' ? 'Proyecto' : escapeHTML(q.text)}</span>
+              <span class="text-xs font-bold text-gray-700">${idx + 1}. ${escapeHTML(q.text || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : 'Pregunta'))}</span>
               ${badge}
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
