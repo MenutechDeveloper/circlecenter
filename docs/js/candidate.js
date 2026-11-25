@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let technicalAnswersByExam = {};
 
   // ==========================================
-  // DETECTOR DE IA (solo exámenes con ai_detector activo)
+  // SEGUIMIENTO DE ACTIVIDAD (solo exámenes con ai_detector activo)
   // ==========================================
   const AI_STORAGE_PREFIX = 'cc_ai_metrics_v1_';
   let aiDetectorActiveExamId = null;
@@ -62,7 +62,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   let aiTrackingInterval = null;
   let aiUnloadCounted = false;
   let aiExamFinished = false;
-  let aiLastCopyToastAt = 0;
   let aiLastPasteToastAt = 0;
 
   function aiStorageKey() {
@@ -142,22 +141,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     return metrics;
   }
 
-  function showAIToast(message, type = 'warning', duration = 4200) {
-    const container = document.getElementById('ai-toast-container');
+  function showExamToast(message, duration = 4200) {
+    const container = document.getElementById('exam-toast-container');
     if (!container) return;
 
-    const palette = type === 'danger'
-      ? 'bg-rose-50 border-rose-200 text-rose-700'
-      : type === 'success'
-        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-        : 'bg-amber-50 border-amber-200 text-amber-800';
-    const icon = type === 'danger'
-      ? 'fa-triangle-exclamation'
-      : type === 'success' ? 'fa-circle-check' : 'fa-shield-halved';
-
     const toast = document.createElement('div');
-    toast.className = `pointer-events-auto flex items-start gap-2 px-4 py-3 rounded-2xl border shadow-lg text-xs font-bold transition-all duration-300 opacity-0 -translate-x-3 ${palette}`;
-    toast.innerHTML = `<i aria-hidden="true" class="fa-solid ${icon} mt-0.5"></i><span>${escapeHTML(message)}</span>`;
+    toast.className = 'pointer-events-auto flex items-start gap-2 px-4 py-3 rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 shadow-lg text-xs font-bold transition-all duration-300 opacity-0 -translate-x-3';
+    toast.innerHTML = `<i aria-hidden="true" class="fa-solid fa-circle-exclamation mt-0.5"></i><span>${escapeHTML(message)}</span>`;
     container.appendChild(toast);
 
     requestAnimationFrame(() => toast.classList.remove('opacity-0', '-translate-x-3'));
@@ -165,24 +155,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       toast.classList.add('opacity-0', '-translate-x-3');
       setTimeout(() => toast.remove(), 320);
     }, duration);
-  }
-
-  function updateAIBadge() {
-    const badge = document.getElementById('ai-detector-badge');
-    const stats = document.getElementById('ai-live-stats');
-    if (!badge) return;
-
-    if (!aiDetectorActiveExamId) {
-      badge.classList.add('hidden');
-      return;
-    }
-
-    badge.classList.remove('hidden');
-    const metrics = getExamAIMetrics(aiDetectorActiveExamId);
-    const copiedCount = Object.keys(metrics.copiedQuestions || {}).length;
-    if (stats) {
-      stats.textContent = `· Pestañas: ${metrics.tabSwitches} · Copias: ${copiedCount} · Pegados: ${metrics.pasteAttempts}`;
-    }
   }
 
   function findQuestionWrapper(node) {
@@ -313,7 +285,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (aiDetectorActiveExamId === exam.id) {
-      updateAIBadge();
       return;
     }
 
@@ -321,7 +292,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     aiExamFinished = false;
     aiUnloadCounted = false;
-    aiLastCopyToastAt = 0;
     aiLastPasteToastAt = 0;
     aiDetectorActiveExamId = exam.id;
 
@@ -330,18 +300,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initAIQuestionTracking(exam.id);
     persistAIMetrics();
-    updateAIBadge();
-
-    if (metrics.tabSwitches || metrics.pageAbandons || metrics.copyCount || metrics.pasteAttempts) {
-      const copied = Object.keys(metrics.copiedQuestions || {}).length;
-      showAIToast(
-        `Detector de IA: se reanudó el seguimiento (pestañas: ${metrics.tabSwitches}, salidas: ${metrics.pageAbandons}, copias: ${copied}, pegados: ${metrics.pasteAttempts}).`,
-        'warning',
-        6500
-      );
-    } else {
-      showAIToast('Detector de IA activo: no podrás pegar texto en este examen y se registrarán los cambios de pestaña.', 'warning', 6000);
-    }
   }
 
   function stopAIDetector() {
@@ -349,8 +307,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     finalizeAIQuestionTracking();
     persistAIMetrics();
     aiDetectorActiveExamId = null;
-    const badge = document.getElementById('ai-detector-badge');
-    if (badge) badge.classList.add('hidden');
   }
 
   function finalizeCurrentExamAIMetrics() {
@@ -360,7 +316,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     metrics.totalMs = (metrics.totalMs || 0) + (Date.now() - (metrics.startedAt || Date.now()));
     metrics.startedAt = Date.now();
     persistAIMetrics();
-    updateAIBadge();
   }
 
   function buildAIDetectorSummary() {
@@ -422,7 +377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
-  // Eventos globales del Detector de IA (solo actúan si hay un examen con detector activo)
+  // Eventos globales del seguimiento (solo actúan si hay un examen con seguimiento activo)
   document.addEventListener('visibilitychange', () => {
     if (!aiDetectorActiveExamId) return;
     const metrics = getExamAIMetrics(aiDetectorActiveExamId);
@@ -430,9 +385,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.hidden) {
       metrics.tabSwitches++;
       persistAIMetrics();
-      updateAIBadge();
-    } else if (metrics.tabSwitches > 0) {
-      showAIToast(`Se registró un cambio de pestaña (${metrics.tabSwitches} en total).`, 'warning');
     }
   });
 
@@ -458,12 +410,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     persistAIMetrics();
-    updateAIBadge();
-    const now = Date.now();
-    if (now - aiLastCopyToastAt > 1800) {
-      aiLastCopyToastAt = now;
-      showAIToast('Se registró una copia del contenido del examen.', 'warning', 3200);
-    }
   });
 
   document.addEventListener('paste', (event) => {
@@ -481,11 +427,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const metrics = getExamAIMetrics(aiDetectorActiveExamId);
     metrics.pasteAttempts++;
     persistAIMetrics();
-    updateAIBadge();
     const now = Date.now();
     if (now - aiLastPasteToastAt > 1800) {
       aiLastPasteToastAt = now;
-      showAIToast('No puedes pegar contenido por detector de IA', 'danger');
+      showExamToast('No puedes pegar contenido en este examen.');
     }
   }, true);
 
@@ -1456,7 +1401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Compatibilidad: si la columna ai_metrics aún no existe, guardar el resultado sin las métricas.
       if (insertError && (insertError.code === '42703' || insertError.code === 'PGRST204') && resultPayload.ai_metrics) {
-        console.warn("La columna results.ai_metrics no existe. Guardando el resultado sin métricas del Detector de IA.");
+        console.warn("La columna results.ai_metrics no existe. Guardando el resultado sin métricas de seguimiento.");
         delete resultPayload.ai_metrics;
         ({ error: insertError } = await supabaseClient
           .from('results')

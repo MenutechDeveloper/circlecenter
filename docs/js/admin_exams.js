@@ -326,11 +326,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           <i class="fa-solid fa-star text-amber-500"></i> Obligatorio
         </span>
       ` : '';
-      const aiBadgeHtml = !isPsy && aiDetectorColumnAvailable && exam.ai_detector === true ? `
-        <span class="bg-rose-100 text-rose-700 text-[9px] font-extrabold px-2.5 py-1 rounded-full border border-rose-200 shadow-sm flex items-center gap-1 shrink-0" title="Cuenta cambios de pestaña, salidas, copias, intentos de pegar y tiempo por pregunta.">
-          <i class="fa-solid fa-shield-halved text-rose-500"></i> Detector de IA
-        </span>
-      ` : '';
       const aiCheckboxHtml = (isPsy || aiDetectorColumnAvailable === false) ? '' : `
         <label class="inline-flex items-center gap-2 cursor-pointer pt-1">
           <input type="checkbox" class="toggle-ai-detector-chk rounded text-rose-500 border-rose-200 focus:ring-rose-400 w-4 h-4 transition" data-id="${exam.id}" ${exam.ai_detector === true ? 'checked' : ''}>
@@ -344,7 +339,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex items-center gap-2 flex-wrap">
               <h3 class="font-bold text-gray-800 text-sm truncate">${exam.name}</h3>
               ${badgeHtml}
-              ${aiBadgeHtml}
             </div>
             <p class="text-xs text-gray-400 truncate">${exam.description || "Sin descripción"}</p>
 
