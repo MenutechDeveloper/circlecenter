@@ -49,6 +49,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     return config;
   }
 
+  function getQuestionText(q) {
+    if (!q) return '';
+    if (q.type === 'programacion' && q.questionCode && String(q.questionCode).trim()) {
+      const text = String(q.text || '').trim();
+      const code = String(q.questionCode).trim();
+      if (!text.includes(code)) return [text, code].filter(Boolean).join('\n\n');
+    }
+    return String(q.text || '');
+  }
+
   // Cargar resultados
   async function loadResults() {
     if (!supabaseClient) return;
@@ -437,7 +447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               : (typeof q.userAnswer === 'string' ? q.userAnswer : '');
             const similarityValue = programmingSimilarity ?? 0;
             answerWidget = `
-              <div class="col-span-2 space-y-2 mt-1">
+              <div class="col-span-2 space-y-3 mt-1">
                 <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
                   <div class="flex items-center justify-between">
                     <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Similitud de sintaxis</span>
@@ -447,13 +457,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="bg-indigo-500 h-2 rounded-full" style="width: ${similarityValue}%"></div>
                   </div>
                 </div>
-                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-white font-mono text-xs shadow-inner">
-                  <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Código Escrito por el Candidato</span>
-                  <pre class="overflow-x-auto max-h-48 whitespace-pre-wrap custom-scroll text-sky-300">${escapeHTML(candidateCode || 'Sin código')}</pre>
-                </div>
-                <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs">
-                  <strong class="text-[8px] text-gray-400 block uppercase">Código Correcto</strong>
-                  <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin código')}</pre>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+                    <span class="text-[9px] font-bold text-amber-700 uppercase tracking-wider block mb-2">Código del candidato</span>
+                    <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(candidateCode || 'Sin código')}</pre>
+                  </div>
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3">
+                    <span class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider block mb-2">Código correcto</span>
+                    <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(q.correct || 'Sin código')}</pre>
+                  </div>
                 </div>
               </div>
             `;
@@ -462,7 +474,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               <div class="col-span-2 space-y-2 mt-1">
                 <div class="bg-blue-50/20 p-2 rounded-lg border border-blue-100/20 text-xs">
                   <strong class="text-[8px] text-gray-400 block uppercase">Respuesta del Aspirante (${respType === 'multiple' ? 'Opción Múltiple' : 'Respuesta Corta'})</strong>
-                  <span class="font-medium text-blue-900">${escapeHTML(q.userAnswer || 'Sin responder')}</span>
+                  <span class="font-medium text-blue-900 whitespace-pre-wrap">${escapeHTML(q.userAnswer || 'Sin responder')}</span>
                 </div>
                 <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs">
                   <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
@@ -489,7 +501,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         partHtml += `
           <div class="pt-2 space-y-1">
             <div class="flex justify-between items-start gap-4">
-              <span class="text-xs font-bold text-gray-700">${idx + 1}. ${escapeHTML(q.text || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : 'Pregunta'))}</span>
+              <span class="text-xs font-bold text-gray-700 whitespace-pre-wrap" style="white-space: pre-wrap;">${idx + 1}. ${escapeHTML(getQuestionText(q) || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : 'Pregunta'))}</span>
               ${badge}
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">

@@ -92,6 +92,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (q.type === 'programacion') {
       if (!q.responseType || q.responseType === 'ide') q.responseType = 'code';
+      if (q.questionCode && String(q.questionCode).trim()) {
+        const code = String(q.questionCode).trim();
+        const text = String(q.text || '').trim();
+        if (!text.includes(code)) q.text = [text, code].filter(Boolean).join('\n\n');
+        q.questionCode = '';
+      }
       if (q.responseType === 'multiple' && (!Array.isArray(q.options) || q.options.length === 0)) {
         q.options = ["", "", "", ""];
       }
@@ -99,6 +105,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (typeof q.questionCode !== 'string') q.questionCode = '';
     }
     return q;
+  }
+
+  function getQuestionText(q) {
+    if (!q) return '';
+    if (q.type === 'programacion' && q.questionCode && String(q.questionCode).trim()) {
+      const text = String(q.text || '').trim();
+      const code = String(q.questionCode).trim();
+      if (!text.includes(code)) return [text, code].filter(Boolean).join('\n\n');
+    }
+    return String(q.text || '');
   }
 
   function normalizeSimProjectAnswer(raw) {
@@ -127,92 +143,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         </button>
       </div>
     `;
-  }
-
-  function beautifyCode(code) {
-    if (!code) return "";
-    let lines = code.split('\n');
-    let indentLevel = 0;
-    const indentString = "  "; // 2 spaces
-    let formattedLines = [];
-
-    // Self-closing tags list
-    const selfClosingTags = ['img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'data', 'col', 'embed', 'param', 'track', 'wbr'];
-
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i].trim();
-      if (!line) continue;
-
-      // 1. Calculate indent adjustments based on closing elements at the start of the line
-      // Check if line starts with a closing tag or closing curly/square brace
-      const startsWithCloseTag = line.match(/^<\/([a-zA-Z0-9:-]+)>/i);
-      const startsWithCloseBrace = line.startsWith('}') || line.startsWith(']');
-
-      if (startsWithCloseTag) {
-        const tagName = startsWithCloseTag[1].toLowerCase();
-        if (!selfClosingTags.includes(tagName)) {
-          indentLevel = Math.max(0, indentLevel - 1);
-        }
-      } else if (startsWithCloseBrace) {
-        indentLevel = Math.max(0, indentLevel - 1);
-      }
-
-      // Add current line with proper indentation
-      formattedLines.push(indentString.repeat(indentLevel) + line);
-
-      // 2. Adjust indentation level for the NEXT lines
-      // Count opening vs closing tags in this line
-      const openTags = [...line.matchAll(/<([a-zA-Z0-9:-]+)(?![^>]*\/>)/g)].map(m => m[1].toLowerCase());
-      const closeTags = [...line.matchAll(/<\/([a-zA-Z0-9:-]+)>/g)].map(m => m[1].toLowerCase());
-
-      let netIndent = 0;
-      openTags.forEach(tag => {
-        if (!selfClosingTags.includes(tag)) {
-          netIndent++;
-        }
-      });
-      closeTags.forEach(tag => {
-        if (!selfClosingTags.includes(tag)) {
-          netIndent--;
-        }
-      });
-
-      // Count curly and square braces
-      const openBraces = (line.match(/{/g) || []).length;
-      const closeBraces = (line.match(/}/g) || []).length;
-      const openBrackets = (line.match(/\[/g) || []).length;
-      const closeBrackets = (line.match(/\]/g) || []).length;
-
-      netIndent += (openBraces - closeBraces);
-      netIndent += (openBraces - closeBraces) ? 0 : 0; // dummy
-      netIndent += (openBrackets - closeBrackets);
-
-      if (startsWithCloseTag && !selfClosingTags.includes(startsWithCloseTag[1].toLowerCase())) {
-        indentLevel = Math.max(0, indentLevel + netIndent + 1);
-      } else if (startsWithCloseBrace) {
-        indentLevel = Math.max(0, indentLevel + netIndent + 1);
-      } else {
-        indentLevel = Math.max(0, indentLevel + netIndent);
-      }
-    }
-
-    return formattedLines.join('\n');
-  }
-
-  function highlightCode(code) {
-    if (!code) return "";
-    let beautified = beautifyCode(code);
-    let escaped = escapeHTML(beautified);
-    // 1. Strings: green
-    escaped = escaped.replace(/(&quot;.*?&quot;|&#039;.*?&#039;|`.*?`)/g, '<span class="text-emerald-400">$1</span>');
-    // 2. Comments: gray/slate
-    escaped = escaped.replace(/(\/\/.*|#.*|&lt;!--[\s\S]*?--&gt;)/g, '<span class="text-slate-500">$1</span>');
-    // 3. Keywords / tags: pink/amber/purple
-    const keywords = /\b(const|let|var|function|return|if|else|for|while|import|from|class|select|from|where|order|by|insert|into|values|delete|update|set|and|or|true|false)\b(?![^<]*>)/gi;
-    escaped = escaped.replace(keywords, '<span class="text-pink-400 font-bold">$1</span>');
-    // 4. HTML tags inside:
-    escaped = escaped.replace(/(&lt;\/?\w+.*?&gt;)/g, '<span class="text-amber-300 font-bold">$1</span>');
-    return escaped;
   }
 
   // Alerta
@@ -768,13 +698,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         extraHtml = `
           <div class="mt-2 space-y-2">
             <div class="flex items-center gap-2 flex-wrap">
-              <input
-                type="text"
-                value="${escapeHTML(q.text || '')}"
-                class="q-text-input flex-1 min-w-[160px] px-2 py-1 rounded-lg border border-dashed border-blue-200 bg-blue-50/30 text-[10px] font-bold text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-300"
+              <textarea
+                rows="1"
+                class="q-text-input flex-1 min-w-[160px] min-h-[30px] px-2 py-1 rounded-lg border border-dashed border-blue-200 bg-blue-50/30 text-[10px] font-bold text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-300 resize-y"
                 data-part-idx="${partIdx}"
                 data-q-idx="${qIdx}"
-              >
+              >${escapeHTML(q.text || '')}</textarea>
               <input type="text" value="${escapeHTML(cfg.yesLabel)}" class="q-proj-config-input px-2.5 py-0.5 rounded-lg bg-blue-500 text-white text-[9px] font-bold text-center w-16 focus:outline-none focus:ring-2 focus:ring-blue-300" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="yesLabel">
               <input type="text" value="${escapeHTML(cfg.noLabel)}" class="q-proj-config-input px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-[9px] font-bold text-center w-16 focus:outline-none focus:ring-2 focus:ring-slate-300" data-part-idx="${partIdx}" data-q-idx="${qIdx}" data-config-key="noLabel">
             </div>
@@ -804,25 +733,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-code text-indigo-500"></i> Pregunta de Programación</span>
 
             <div class="space-y-1">
-              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Código en la Pregunta (opcional)</label>
-              <textarea
-                class="q-question-code-input font-mono w-full px-3 py-2 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-sky-400 h-20 custom-scroll"
-                data-part-idx="${partIdx}"
-                data-q-idx="${qIdx}"
-                placeholder="Escribe aquí el código que verá el candidato..."
-              >${q.questionCode || ''}</textarea>
-            </div>
-
-            <div class="space-y-1">
-              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Tipo de Respuesta</label>
+              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Tipo</label>
               <select
                 class="q-response-type-select px-2 py-1.5 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-white w-full text-indigo-700 font-bold"
                 data-part-idx="${partIdx}"
                 data-q-idx="${qIdx}"
               >
-                <option value="multiple" ${respType === 'multiple' ? 'selected' : ''}>Opción Múltiple (yo escribo el código)</option>
-                <option value="code" ${respType === 'code' ? 'selected' : ''}>El candidato escribe código</option>
-                <option value="short" ${respType === 'short' ? 'selected' : ''}>Texto Abierto / Corto</option>
+                <option value="multiple" ${respType === 'multiple' ? 'selected' : ''}>Pregunta con código</option>
+                <option value="code" ${respType === 'code' ? 'selected' : ''}>Respuesta con código</option>
+                <option value="short" ${respType === 'short' ? 'selected' : ''}>Texto corto</option>
               </select>
             </div>
 
@@ -863,12 +782,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
               ` : `
                 <div>
-                  <label class="block text-[9px] font-bold text-indigo-500 uppercase">${respType === 'code' ? 'Código Correcto' : 'Respuesta Correcta'}</label>
+                  <label class="block text-[9px] font-bold text-indigo-500 uppercase">${respType === 'code' ? 'Respuesta con código' : 'Respuesta de texto corto'}</label>
                   <textarea
-                    class="q-correct-code-input font-mono w-full px-3 py-1.5 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-emerald-400 h-16 custom-scroll"
+                    rows="${respType === 'code' ? '7' : '3'}"
+                    class="q-correct-code-input font-mono w-full px-3 py-2 border border-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-300 rounded-lg text-xs bg-amber-50 text-slate-800 resize-y custom-scroll"
                     data-part-idx="${partIdx}"
                     data-q-idx="${qIdx}"
-                    placeholder="${respType === 'code' ? 'Escribe el código correcto...' : 'Escribe la respuesta exacta esperada...'}"
+                    placeholder="${respType === 'code' ? 'Escribe la respuesta correcta en código...' : 'Escribe la respuesta corta esperada...'}"
                   >${q.correct || ''}</textarea>
                 </div>
               `}
@@ -904,14 +824,13 @@ document.addEventListener('DOMContentLoaded', async () => {
               ${q.type === 'proyectos' ? '' : `<span class="text-xs text-gray-400 font-bold">Pregunta ${qIdx + 1}</span>`}
             </div>
             ${q.type === 'proyectos' ? '' : `
-            <input
-              type="text"
-              value="${escapeHTML(q.text)}"
-              class="q-text-input px-4 py-2.5 w-full border border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded-xl text-sm font-semibold text-gray-800"
+            <textarea
+              rows="${q.type === 'programacion' ? '8' : '4'}"
+              class="q-text-input px-4 py-3 w-full border border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded-xl text-sm font-semibold text-gray-800 resize-y custom-scroll"
               data-part-idx="${partIdx}"
               data-q-idx="${qIdx}"
-              placeholder="Escribe el enunciado de la pregunta aquí..."
-            >
+              placeholder="Escribe la pregunta o el texto que verá el candidato..."
+            >${escapeHTML(q.text)}</textarea>
             `}
           </div>
 
@@ -931,9 +850,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       correct: ""
     };
     if (type === 'programacion') {
-      qObj.questionCode = "";
-      qObj.responseType = "multiple";
-      qObj.options = ["", "", "", ""];
+      qObj.responseType = "code";
     }
     if (type === 'proyectos') {
       qObj.proyectosConfig = getProjectConfigRaw({});
@@ -959,14 +876,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const question = partsData[partIdx].questions[qIdx];
         question.proyectosConfig = question.proyectosConfig || getProjectConfigRaw({});
         question.proyectosConfig[key] = e.target.value;
-      });
-    });
-
-    document.querySelectorAll('.q-question-code-input').forEach(textarea => {
-      textarea.addEventListener('input', (e) => {
-        const partIdx = e.target.getAttribute('data-part-idx');
-        const qIdx = e.target.getAttribute('data-q-idx');
-        partsData[partIdx].questions[qIdx].questionCode = e.target.value;
       });
     });
 
@@ -1411,33 +1320,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (q.type === 'programacion') {
           const respType = q.responseType === 'multiple' || q.responseType === 'short' ? q.responseType : 'code';
 
-          let questionCodeHtml = "";
-          if (q.questionCode && q.questionCode.trim()) {
-            questionCodeHtml = `
-              <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-300 max-h-80 overflow-y-auto whitespace-pre-wrap relative shadow-inner no-scrollbar">
-                <div class="flex items-center border-b border-slate-800 pb-1.5 mb-2 select-none">
-                  <span class="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Código</span>
-                </div>
-                <code>${highlightCode(q.questionCode)}</code>
-              </div>
-            `;
-          }
-
           if (respType === 'multiple') {
             widget = `
-              ${questionCodeHtml ? `
-                <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col text-white relative mb-4" data-q-id="${q.id}">
-                  ${questionCodeHtml}
-                </div>
-              ` : ''}
-
-              <div class="bg-white p-3 rounded-xl border border-blue-100/50 space-y-2 text-black">
-                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Selecciona la opción correcta:</span>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+              <div class="bg-white p-3 rounded-xl border border-blue-100/50 mt-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   ${(q.options || []).map(opt => `
                     <label class="flex items-center gap-2.5 p-3 rounded-xl border border-blue-50 bg-white hover:bg-blue-50/50 cursor-pointer transition text-xs font-semibold text-gray-700 shadow-sm">
-                      <input type="radio" name="sim_tech_q_${q.id}" value="${opt}" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500 bg-white border-blue-200" data-q-id="${q.id}">
-                      <span>${escapeHTML(opt)}</span>
+                      <input type="radio" name="sim_tech_q_${q.id}" value="${escapeHTML(opt)}" class="sim-tech-radio-input focus:ring-blue-400 text-blue-500 bg-white border-blue-200" data-q-id="${q.id}">
+                      <span class="whitespace-pre-wrap">${escapeHTML(opt)}</span>
                     </label>
                   `).join('')}
                 </div>
@@ -1445,28 +1335,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
           } else if (respType === 'short') {
             widget = `
-              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
-                ${questionCodeHtml}
-
-                <div class="space-y-1">
-                  <label class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Escribe tu respuesta:</label>
-                  <textarea rows="3" class="sim-tech-textarea-input w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-indigo-500 focus:outline-none custom-scroll" data-q-id="${q.id}"></textarea>
-                </div>
-              </div>
+              <textarea rows="3" class="sim-tech-textarea-input w-full mt-2 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-slate-800 focus:ring-2 focus:ring-amber-300 focus:outline-none resize-y custom-scroll" data-q-id="${q.id}"></textarea>
             `;
           } else {
             widget = `
-              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
-                ${questionCodeHtml}
-
-                <div class="space-y-1">
-                  <label class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Escribe tu código:</label>
-                  <textarea rows="10" class="sim-tech-code-input w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-indigo-500 focus:outline-none custom-scroll" data-q-id="${q.id}" spellcheck="false"></textarea>
-                </div>
-              </div>
+              <textarea rows="12" class="sim-tech-code-input w-full mt-2 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm font-mono text-slate-800 focus:ring-2 focus:ring-amber-300 focus:outline-none resize-y custom-scroll min-h-[260px]" data-q-id="${q.id}" spellcheck="false"></textarea>
             `;
           }
         } else if (q.type === 'canvas') {
+
 
           widget = `
             <div class="illustrator-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 text-white relative select-none overflow-hidden" data-q-id="${q.id}">
@@ -1583,7 +1460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         partHtml += `
           <div class="space-y-1 bg-white p-5 rounded-2xl border border-blue-50 shadow-sm text-black">
-            ${q.type === 'proyectos' ? '' : `<span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed">Pregunta: ${escapeHTML(q.text)}</span>`}
+            ${q.type === 'proyectos' ? '' : `<span class="text-sm font-semibold text-gray-800 block mb-1.5 leading-relaxed whitespace-pre-wrap ${q.type === 'programacion' ? 'font-mono text-[13px]' : ''}">${escapeHTML(getQuestionText(q))}</span>`}
             ${widget}
           </div>
         `;
@@ -2401,10 +2278,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                       <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${similarityValue}%"></div>
                     </div>
                   </div>
-                  <p class="text-xs text-gray-600 mt-1"><strong>Tu código:</strong></p>
-                  <pre class="bg-slate-900 text-slate-300 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(fullCode || "Sin código")}</pre>
-                  <p class="text-xs text-gray-600 mt-1"><strong>Código correcto esperado:</strong></p>
-                  <pre class="bg-slate-900 text-emerald-400 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(q.correct || "Sin código")}</pre>
+                  <div class="grid grid-cols-1 gap-2 mt-2">
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-2">
+                      <span class="text-[9px] font-bold text-amber-700 uppercase tracking-wider block mb-1">Código del candidato</span>
+                      <pre class="text-[10px] font-mono text-slate-800 whitespace-pre-wrap break-words max-h-56 overflow-auto">${escapeHTML(fullCode || "Sin código")}</pre>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
+                      <span class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">Código correcto</span>
+                      <pre class="text-[10px] font-mono text-slate-800 whitespace-pre-wrap break-words max-h-56 overflow-auto">${escapeHTML(q.correct || "Sin código")}</pre>
+                    </div>
+                  </div>
                 `;
               } else {
                 const answerText = typeof ans === 'string' ? ans.trim() : '';
@@ -2426,10 +2309,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                       <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${similarityValue}%"></div>
                     </div>
                   </div>
-                  <p class="text-xs text-gray-600 mt-1"><strong>Tu código:</strong></p>
-                  <pre class="bg-slate-900 text-slate-300 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(answerText || "Sin código")}</pre>
-                  <p class="text-xs text-gray-600 mt-1"><strong>Código correcto esperado:</strong></p>
-                  <pre class="bg-slate-900 text-emerald-400 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(q.correct || "Sin código")}</pre>
+                  <div class="grid grid-cols-1 gap-2 mt-2">
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-2">
+                      <span class="text-[9px] font-bold text-amber-700 uppercase tracking-wider block mb-1">Código del candidato</span>
+                      <pre class="text-[10px] font-mono text-slate-800 whitespace-pre-wrap break-words max-h-56 overflow-auto">${escapeHTML(answerText || "Sin código")}</pre>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
+                      <span class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">Código correcto</span>
+                      <pre class="text-[10px] font-mono text-slate-800 whitespace-pre-wrap break-words max-h-56 overflow-auto">${escapeHTML(q.correct || "Sin código")}</pre>
+                    </div>
+                  </div>
                 `;
               }
             }
@@ -2461,7 +2350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           reportHtml += `
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-1 text-black">
               <div class="flex items-center justify-between flex-wrap gap-2">
-                <span class="text-xs font-semibold text-gray-700">Pregunta: ${escapeHTML(q.text || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : ''))}</span>
+                <span class="text-xs font-semibold text-gray-700 whitespace-pre-wrap" style="white-space: pre-wrap;">${escapeHTML(getQuestionText(q) || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : ''))}</span>
                 ${statusBadge}
               </div>
               ${comparisonDetails}
