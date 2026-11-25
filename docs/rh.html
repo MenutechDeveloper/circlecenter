@@ -40,8 +40,8 @@
 </head>
 <body class="bg-gradient-to-tr from-blue-100 via-sky-100 to-indigo-100 min-h-screen flex flex-col justify-between p-4">
 
-  <!-- Notificaciones del Detector de IA -->
-  <div id="ai-toast-container" aria-live="polite" class="fixed top-4 left-4 z-[200] space-y-2 w-[calc(100%-2rem)] max-w-xs pointer-events-none"></div>
+  <!-- Aviso al intentar pegar contenido -->
+  <div id="exam-toast-container" aria-live="polite" class="fixed top-4 left-4 z-[200] space-y-2 w-[calc(100%-2rem)] max-w-xs pointer-events-none"></div>
 
   <!-- Container Box -->
   <div class="max-w-6xl w-full mx-auto bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border border-white/50 overflow-hidden flex flex-col my-auto">
@@ -162,11 +162,6 @@
             <span id="tech-header-tag" class="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Examen Técnico</span>
             <h2 class="text-xl font-bold text-gray-800" id="tech-exam-title">Examen</h2>
             <p class="text-xs text-gray-400" id="tech-exam-desc">Evaluación asignada de acuerdo a la vacante seleccionada.</p>
-            <div id="ai-detector-badge" class="hidden mt-2 inline-flex flex-wrap items-center gap-2 text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100 px-2.5 py-1 rounded-full">
-              <i aria-hidden="true" class="fa-solid fa-shield-halved"></i>
-              <span>Detector de IA activo</span>
-              <span id="ai-live-stats" aria-live="polite" class="text-rose-400 font-semibold"></span>
-            </div>
           </div>
           <div class="text-right hidden sm:block">
             <span id="tech-progress-text" class="text-xs font-bold text-blue-400">0 / 0 Respondidas</span>
