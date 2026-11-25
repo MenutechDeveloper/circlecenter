@@ -138,6 +138,19 @@
             ></textarea>
           </div>
 
+          <label id="ai-detector-label" class="flex items-start gap-3 p-4 bg-rose-50/60 border border-rose-100 rounded-2xl cursor-pointer select-none">
+            <input type="checkbox" id="exam-ai-detector-input" class="mt-0.5 w-4 h-4 rounded accent-rose-500">
+            <span>
+              <span class="block text-sm font-bold text-rose-700">Detector de IA</span>
+              <span class="block text-[11px] text-rose-500 font-medium">Solo se aplicará a este examen: cuenta cambios de pestaña, salidas de la página, copias, intentos de pegar y tiempo por pregunta. El candidato no podrá pegar texto en este examen.</span>
+            </span>
+          </label>
+
+          <p id="ai-detector-db-warning" role="alert" class="hidden text-[11px] font-bold text-rose-600 bg-rose-100/60 border border-rose-200 rounded-xl px-3 py-2">
+            <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+            Falta actualizar la base de datos. Ejecuta <code>supabase_schema.sql</code> en el editor SQL de Supabase (columnas <code>ai_detector</code> en <code>exams</code> y <code>ai_metrics</code> en <code>results</code>) para activar el Detector de IA.
+          </p>
+
           <div class="flex items-center justify-between pt-4 border-t border-blue-50">
             <button type="button" id="btn-back-to-1" class="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold rounded-2xl text-sm transition">
               Atrás
