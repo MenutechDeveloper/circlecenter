@@ -349,61 +349,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     modalAIDetector.classList.remove('hidden');
   }
 
+  function isTechnicalAnswerCorrect(q) {
+    if (q.type === 'programacion') {
+      if (q.userAnswer && typeof q.userAnswer === 'object') {
+        const ansObj = q.userAnswer;
+        const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
+        const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
+        const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
+        const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
+        const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
+        return compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
+      }
+      const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
+      if (ans === "") return null;
+      return ans === (q.correct || "").trim();
+    }
+    const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
+    if (ans === "") return null;
+    return ans === q.correct;
+  }
+
+  function calculateTechnicalScore(technicalAnswers) {
+    let correct = 0;
+    let incorrect = 0;
+    let empty = 0;
+    let total = 0;
+    const parts = (technicalAnswers && technicalAnswers.parts) || [];
+    parts.forEach(part => {
+      (part.questions || []).forEach(q => {
+        const isGradable = q.type === 'multiple' || q.type === 'boolean' || q.type === 'programacion';
+        if (!isGradable) return;
+        total++;
+        const result = isTechnicalAnswerCorrect(q);
+        if (result === null) empty++;
+        else if (result) correct++;
+        else incorrect++;
+      });
+    });
+    return {
+      correct,
+      incorrect,
+      empty,
+      total,
+      scorePct: total > 0 ? Math.round((correct / total) * 100) : 100
+    };
+  }
+
   function showReportModal(report) {
     activeReport = report;
     modalCandName.textContent = report.candidate_name;
     modalCandPos.textContent = `Vacante de Interés: ${report.assigned_exam_name || 'General'}`;
 
-    // Contar correctas, incorrectas y vacías en examen técnico
-    let correct = 0;
-    let incorrect = 0;
-    let empty = 0;
-    let totalQuestions = 0;
-
-    const techParts = (report.technical_answers && report.technical_answers.parts) || [];
-    techParts.forEach(part => {
-      part.questions.forEach(q => {
-        const isGradable = q.type === 'multiple' || q.type === 'boolean' || q.type === 'programacion';
-        if (isGradable) {
-          totalQuestions++;
-          if (q.type === 'programacion') {
-            if (q.userAnswer && typeof q.userAnswer === 'object') {
-              const ansObj = q.userAnswer;
-              const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
-              const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
-              const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
-              const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
-              const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
-              const isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
-              if (isCorrect) correct++; else incorrect++;
-            } else {
-              const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
-              if (ans === "") {
-                empty++;
-              } else if (ans === (q.correct || "").trim()) {
-                correct++;
-              } else {
-                incorrect++;
-              }
-            }
-          } else {
-            const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
-            if (ans === "") {
-              empty++;
-            } else if (ans === q.correct) {
-              correct++;
-            } else {
-              incorrect++;
-            }
-          }
-        }
-      });
-    });
-
-    const scorePct = totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 100;
-    if (totalQuestions > 0) {
-      modalCandScore.textContent = `${correct} bien, ${incorrect} mal, ${empty} vacías de ${totalQuestions}`;
-      modalCandPercentage.textContent = `${scorePct}%`;
+    const score = calculateTechnicalScore(report.technical_answers);
+    if (score.total > 0) {
+      modalCandScore.textContent = `${score.correct} bien, ${score.incorrect} mal, ${score.empty} vacías de ${score.total}`;
+      modalCandPercentage.textContent = `${score.scorePct}%`;
     } else {
       modalCandScore.textContent = "Evaluación cualitativa";
       modalCandPercentage.textContent = "—";
@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Renderizar secciones de examen
     renderAnswers(modalAnswersPsy, report.psychometric_answers);
-    renderAnswers(modalAnswersTech, report.technical_answers);
+    renderAnswers(modalAnswersTech, report.technical_answers, { editable: true });
 
     // Resetear Tabs
     modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
@@ -444,7 +444,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     resultModal.classList.remove('hidden');
   }
 
-  function renderAnswers(container, answersData) {
+  function renderAnswers(container, answersData, options = {}) {
+    const editable = !!options.editable;
     container.innerHTML = "";
     const parts = (answersData && answersData.parts) || [];
     if (parts.length === 0) {
@@ -452,7 +453,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    parts.forEach(part => {
+    if (editable) {
+      container.innerHTML += `
+        <div class="edit-correct-banner bg-violet-50 border border-violet-100 text-violet-700 text-[11px] rounded-xl p-3 flex items-start gap-2">
+          <i class="fa-solid fa-circle-info mt-0.5"></i>
+          <span>Puedes corregir la <strong>clave esperada</strong> con el botón "Editar clave". La respuesta del candidato no se modifica y el porcentaje se recalcula automáticamente.</span>
+        </div>
+      `;
+    }
+
+    parts.forEach((part, partIdx) => {
       const partTitle = part.title && String(part.title).trim() ? part.title : 'Preguntas';
       let partHtml = `
         <div class="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50 space-y-3">
@@ -515,6 +525,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           badge = `<span class="text-[9px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">Abierta</span>`;
         }
+
+        const editButton = editable ? `
+          <button type="button" class="edit-correct-btn text-[9px] font-bold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-100 px-2 py-0.5 rounded-full transition" data-part-idx="${partIdx}" data-q-idx="${idx}" title="Editar mi respuesta correcta">
+            <i class="fa-solid fa-pen mr-1"></i>Editar clave
+          </button>
+        ` : '';
 
         let answerWidget = "";
         if (q.type === 'proyectos') {
@@ -614,9 +630,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <span class="text-[9px] font-bold text-amber-700 uppercase tracking-wider block mb-2">Código del candidato</span>
                     <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(candidateCode || 'Sin código')}</pre>
                   </div>
-                  <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3">
-                    <span class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider block mb-2">Código correcto</span>
-                    <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(q.correct || 'Sin código')}</pre>
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3" data-correct-wrap data-part-idx="${partIdx}" data-q-idx="${idx}">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                      <span class="text-[9px] font-bold text-emerald-700 uppercase tracking-wider block">Código correcto</span>
+                      ${editButton}
+                    </div>
+                    <div data-correct-display>
+                      <pre class="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-auto custom-scroll">${escapeHTML(q.correct || 'Sin código')}</pre>
+                    </div>
+                    <div data-correct-editor class="hidden mt-2"></div>
                   </div>
                 </div>
               </div>
@@ -628,9 +650,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <strong class="text-[8px] text-gray-400 block uppercase">Respuesta del Aspirante (${respType === 'multiple' ? 'Opción Múltiple' : 'Respuesta Corta'})</strong>
                   <span class="font-medium text-blue-900 whitespace-pre-wrap">${escapeHTML(q.userAnswer || 'Sin responder')}</span>
                 </div>
-                <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs">
-                  <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
-                  <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin solución esperada')}</pre>
+                <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs" data-correct-wrap data-part-idx="${partIdx}" data-q-idx="${idx}">
+                  <div class="flex items-center justify-between gap-2">
+                    <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
+                    ${editButton}
+                  </div>
+                  <div data-correct-display>
+                    <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin solución esperada')}</pre>
+                  </div>
+                  <div data-correct-editor class="hidden mt-2"></div>
                 </div>
               </div>
             `;
@@ -642,16 +670,22 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span class="font-medium text-blue-900">${q.userAnswer || '<em class="text-gray-300">Sin responder</em>'}</span>
             </div>
             ${hasCorrect ? `
-              <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10">
-                <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
-                <span class="font-medium text-emerald-950">${q.correct}</span>
+              <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10" data-correct-wrap data-part-idx="${partIdx}" data-q-idx="${idx}">
+                <div class="flex items-center justify-between gap-2">
+                  <strong class="text-[8px] text-gray-400 block uppercase">Clave Esperada</strong>
+                  ${editButton}
+                </div>
+                <div data-correct-display>
+                  <span class="font-medium text-emerald-950">${escapeHTML(q.correct)}</span>
+                </div>
+                <div data-correct-editor class="hidden mt-2"></div>
               </div>
             ` : ''}
           `;
         }
 
         partHtml += `
-          <div class="pt-2 space-y-1">
+          <div class="pdf-question pt-2 space-y-1" data-part-idx="${partIdx}" data-q-idx="${idx}">
             <div class="flex justify-between items-start gap-4">
               <span class="text-xs font-bold text-gray-700 whitespace-pre-wrap" style="white-space: pre-wrap;">${idx + 1}. ${escapeHTML(getQuestionText(q) || (q.type === 'proyectos' ? '¿Has desarrollado proyectos?' : 'Pregunta'))}</span>
               ${badge}
@@ -670,6 +704,202 @@ document.addEventListener('DOMContentLoaded', async () => {
       container.innerHTML += partHtml;
     });
   }
+
+  function showResultsToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-4 left-4 z-[300] bg-violet-600 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2600);
+  }
+
+  function openCorrectEditor(btn) {
+    if (!activeReport) return;
+    const partIdx = Number(btn.dataset.partIdx);
+    const qIdx = Number(btn.dataset.qIdx);
+    const q = activeReport.technical_answers &&
+      activeReport.technical_answers.parts &&
+      activeReport.technical_answers.parts[partIdx] &&
+      activeReport.technical_answers.parts[partIdx].questions
+      ? activeReport.technical_answers.parts[partIdx].questions[qIdx]
+      : null;
+    if (!q) return;
+
+    const wrap = btn.closest('[data-correct-wrap]');
+    if (!wrap) return;
+    const display = wrap.querySelector('[data-correct-display]');
+    const editor = wrap.querySelector('[data-correct-editor]');
+    if (!display || !editor || !editor.classList.contains('hidden')) return;
+
+    modalAnswersTech.querySelectorAll('[data-correct-editor]:not(.hidden)').forEach(openEditor => {
+      openEditor.classList.add('hidden');
+      openEditor.innerHTML = '';
+      const openWrap = openEditor.closest('[data-correct-wrap]');
+      const openDisplay = openWrap ? openWrap.querySelector('[data-correct-display]') : null;
+      if (openDisplay) openDisplay.classList.remove('hidden');
+    });
+
+    const respType = q.type === 'programacion'
+      ? (q.responseType === 'multiple' || q.responseType === 'short' ? q.responseType : 'code')
+      : null;
+
+    let inputHtml = '';
+    if (q.type === 'multiple' || (q.type === 'programacion' && respType === 'multiple')) {
+      const options = (Array.isArray(q.options) ? q.options : [])
+        .filter(opt => opt !== undefined && opt !== null && String(opt).trim() !== '');
+      inputHtml = `
+        <select data-correct-input class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
+          <option value="">Selecciona la correcta...</option>
+          ${options.map(opt => `<option value="${escapeHTML(opt)}" ${String(opt) === String(q.correct) ? 'selected' : ''}>${escapeHTML(opt)}</option>`).join('')}
+        </select>
+      `;
+    } else if (q.type === 'boolean') {
+      inputHtml = `
+        <select data-correct-input class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
+          <option value="Verdadero" ${q.correct === 'Verdadero' ? 'selected' : ''}>Verdadero</option>
+          <option value="Falso" ${q.correct === 'Falso' ? 'selected' : ''}>Falso</option>
+        </select>
+      `;
+    } else if (q.type === 'programacion' && respType === 'code') {
+      inputHtml = `
+        <textarea data-correct-input rows="7" class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-violet-50/30 text-slate-800 font-mono resize-y custom-scroll focus:outline-none focus:ring-1 focus:ring-violet-300">${escapeHTML(q.correct || '')}</textarea>
+      `;
+    } else if (q.type === 'programacion' && respType === 'short') {
+      inputHtml = `
+        <input data-correct-input type="text" value="${escapeHTML(q.correct || '')}" class="w-full px-3 py-2 border border-violet-200 rounded-xl text-xs bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300">
+      `;
+    } else {
+      return;
+    }
+
+    editor.innerHTML = `
+      <div class="space-y-2">
+        ${inputHtml}
+        <div class="flex items-center justify-end gap-2">
+          <button type="button" class="cancel-correct-btn px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold text-[10px] transition">Cancelar</button>
+          <button type="button" class="save-correct-btn px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-[10px] transition" data-part-idx="${partIdx}" data-q-idx="${qIdx}">
+            <i class="fa-solid fa-check mr-1"></i>Guardar
+          </button>
+        </div>
+      </div>
+    `;
+    display.classList.add('hidden');
+    editor.classList.remove('hidden');
+    const input = editor.querySelector('[data-correct-input]');
+    if (input) input.focus();
+  }
+
+  function cancelCorrectEditor(btn) {
+    const wrap = btn.closest('[data-correct-wrap]');
+    if (!wrap) return;
+    const display = wrap.querySelector('[data-correct-display]');
+    const editor = wrap.querySelector('[data-correct-editor]');
+    if (display) display.classList.remove('hidden');
+    if (editor) {
+      editor.classList.add('hidden');
+      editor.innerHTML = '';
+    }
+  }
+
+  function refreshActiveReport() {
+    if (!activeReport) return;
+    const score = calculateTechnicalScore(activeReport.technical_answers);
+    if (score.total > 0) {
+      modalCandScore.textContent = `${score.correct} bien, ${score.incorrect} mal, ${score.empty} vacías de ${score.total}`;
+      modalCandPercentage.textContent = `${score.scorePct}%`;
+    } else {
+      modalCandScore.textContent = "Evaluación cualitativa";
+      modalCandPercentage.textContent = "—";
+    }
+    renderAnswers(modalAnswersPsy, activeReport.psychometric_answers);
+    renderAnswers(modalAnswersTech, activeReport.technical_answers, { editable: true });
+    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
+    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
+    modalAnswersTech.classList.remove('hidden');
+    modalAnswersPsy.classList.add('hidden');
+  }
+
+  async function saveCorrectAnswer(btn) {
+    if (!activeReport) return;
+    const partIdx = Number(btn.dataset.partIdx);
+    const qIdx = Number(btn.dataset.qIdx);
+    const part = activeReport.technical_answers &&
+      activeReport.technical_answers.parts &&
+      activeReport.technical_answers.parts[partIdx];
+    const q = part && part.questions ? part.questions[qIdx] : null;
+    if (!q) return;
+
+    const wrap = btn.closest('[data-correct-wrap]');
+    const input = wrap ? wrap.querySelector('[data-correct-input]') : null;
+    if (!input) return;
+
+    const newValue = typeof input.value === 'string' ? input.value.trim() : '';
+    if (!newValue) {
+      showPastelAlert('La respuesta correcta no puede estar vacía.');
+      return;
+    }
+    if (String(newValue) === String(q.correct || '')) {
+      cancelCorrectEditor(btn);
+      return;
+    }
+
+    const originalValue = q.correct;
+    const originalScore = activeReport.score;
+    const originalMaxScore = activeReport.max_score;
+    q.correct = newValue;
+    const score = calculateTechnicalScore(activeReport.technical_answers);
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Guardando...';
+
+    try {
+      const { error } = await supabaseClient
+        .from('results')
+        .update({
+          technical_answers: activeReport.technical_answers,
+          score: score.correct,
+          max_score: score.total
+        })
+        .eq('id', activeReport.id);
+      if (error) throw error;
+
+      activeReport.score = score.correct;
+      activeReport.max_score = score.total;
+      refreshActiveReport();
+      renderResults();
+      showResultsToast('Clave actualizada. Porcentaje recalculado.');
+    } catch (err) {
+      q.correct = originalValue;
+      activeReport.score = originalScore;
+      activeReport.max_score = originalMaxScore;
+      console.error(err);
+      showPastelAlert('No se pudo guardar la corrección: ' + err.message);
+      cancelCorrectEditor(btn);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Guardar';
+    }
+  }
+
+  modalAnswersTech.addEventListener('click', (event) => {
+    const editBtn = event.target.closest('.edit-correct-btn');
+    if (editBtn) {
+      event.preventDefault();
+      openCorrectEditor(editBtn);
+      return;
+    }
+    const saveBtn = event.target.closest('.save-correct-btn');
+    if (saveBtn) {
+      event.preventDefault();
+      saveCorrectAnswer(saveBtn);
+      return;
+    }
+    const cancelBtn = event.target.closest('.cancel-correct-btn');
+    if (cancelBtn) {
+      event.preventDefault();
+      cancelCorrectEditor(cancelBtn);
+    }
+  });
 
   // Acción de asignar examen adicional en cualquier momento
   const assignExtraBtn = document.getElementById('modal-btn-assign-extra');
@@ -732,8 +962,99 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('#modal-ai-detector details').forEach(details => { details.open = true; });
   });
 
-  modalPrintBtn.addEventListener('click', () => {
-    window.print();
+  modalPrintBtn.addEventListener('click', async () => {
+    if (!activeReport) return;
+    const originalHtml = modalPrintBtn.innerHTML;
+    modalPrintBtn.disabled = true;
+    modalPrintBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Generando PDF...';
+    let pdfWrapper = null;
+
+    try {
+      if (typeof html2pdf === 'undefined') throw new Error('html2pdf no está disponible');
+
+      const modalContent = document.querySelector('#result-modal > div');
+      if (!modalContent) throw new Error('No se encontró el reporte');
+
+      const clone = modalContent.cloneNode(true);
+      clone.classList.add('pdf-report');
+      clone.querySelectorAll('#modal-footer, #modal-tabs, #modal-assign-extra-section, #modal-close-btn, .edit-correct-btn, .edit-correct-banner').forEach(el => el.remove());
+      clone.querySelectorAll('[data-correct-editor]').forEach(el => el.remove());
+      clone.querySelectorAll('[data-correct-display]').forEach(el => el.classList.remove('hidden'));
+
+      const psy = clone.querySelector('#modal-answers-psy');
+      const tech = clone.querySelector('#modal-answers-tech');
+      if (psy) {
+        psy.classList.remove('hidden');
+        const psyTitle = document.createElement('h3');
+        psyTitle.className = 'text-sm font-bold text-gray-700 mt-4 mb-2';
+        psyTitle.textContent = 'Respuestas Psicométricas';
+        psy.parentNode.insertBefore(psyTitle, psy);
+      }
+      if (tech) {
+        tech.classList.remove('hidden');
+        const techTitle = document.createElement('h3');
+        techTitle.className = 'text-sm font-bold text-gray-700 mt-6 mb-2';
+        techTitle.textContent = 'Respuestas de los Exámenes';
+        tech.parentNode.insertBefore(techTitle, tech);
+      }
+
+      clone.querySelectorAll('details').forEach(details => { details.open = true; });
+      clone.querySelectorAll('[class*="max-h-"], [class*="overflow-"]').forEach(el => {
+        el.style.maxHeight = 'none';
+        el.style.overflow = 'visible';
+      });
+      clone.style.maxHeight = 'none';
+      clone.style.overflow = 'hidden';
+      clone.style.display = 'block';
+      const cloneBody = clone.querySelector('.p-6.overflow-y-auto');
+      if (cloneBody) {
+        cloneBody.style.flex = 'none';
+        cloneBody.style.overflow = 'visible';
+        cloneBody.style.maxHeight = 'none';
+      }
+
+      const pdfFooter = document.createElement('div');
+      pdfFooter.className = 'mt-6 pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400';
+      pdfFooter.textContent = `Reporte generado el ${new Date().toLocaleString('es-MX')} · CircleCenter`;
+      clone.appendChild(pdfFooter);
+
+      const pdfStyle = document.createElement('style');
+      pdfStyle.textContent = `
+        .pdf-report .bg-white.rounded-xl,
+        .pdf-report .bg-emerald-50,
+        .pdf-report .pdf-question {
+          break-inside: avoid;
+        }
+      `;
+      clone.appendChild(pdfStyle);
+
+      pdfWrapper = document.createElement('div');
+      pdfWrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;background:#ffffff;padding:24px;';
+      pdfWrapper.appendChild(clone);
+      document.body.appendChild(pdfWrapper);
+
+      const safeName = String(activeReport.candidate_name || 'candidato')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/gi, '_')
+        .replace(/^_+|_+$/g, '') || 'candidato';
+
+      await html2pdf().set({
+        margin: [10, 10, 10, 10],
+        filename: `reporte_${safeName}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0, windowWidth: 900 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      }).from(clone).save();
+    } catch (err) {
+      console.error(err);
+      showPastelAlert('No se pudo generar el PDF automáticamente. Se abrirá el diálogo de impresión para guardarlo como PDF.');
+      window.print();
+    } finally {
+      if (pdfWrapper) pdfWrapper.remove();
+      modalPrintBtn.disabled = false;
+      modalPrintBtn.innerHTML = originalHtml;
+    }
   });
 
   modalDeleteBtn.addEventListener('click', () => {
