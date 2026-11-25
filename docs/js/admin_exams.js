@@ -82,6 +82,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!Array.isArray(q.options)) q.options = [];
       if (typeof q.correct !== 'string') q.correct = '';
     }
+    if (q.type === 'programacion') {
+      if (!q.responseType || q.responseType === 'ide') q.responseType = 'code';
+      if (q.responseType === 'multiple' && (!Array.isArray(q.options) || q.options.length === 0)) {
+        q.options = ["", "", "", ""];
+      }
+      if (typeof q.correct !== 'string') q.correct = '';
+      if (typeof q.questionCode !== 'string') q.questionCode = '';
+    }
     return q;
   }
 
@@ -807,18 +815,18 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         `;
       } else if (q.type === 'programacion') {
-        const respType = q.responseType || 'ide';
+        const respType = q.responseType === 'multiple' || q.responseType === 'short' ? q.responseType : 'code';
         extraHtml = `
           <div class="mt-2 text-[10px] text-indigo-600 bg-indigo-50 p-3 rounded-xl border border-indigo-100 space-y-3">
             <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-code text-indigo-500"></i> Pregunta de Programación</span>
 
             <div class="space-y-1">
-              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Código Inicial de la Pregunta</label>
+              <label class="block text-[9px] font-bold text-indigo-500 uppercase">Código en la Pregunta (opcional)</label>
               <textarea
                 class="q-question-code-input font-mono w-full px-3 py-2 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-sky-400 h-20 custom-scroll"
                 data-part-idx="${partIdx}"
                 data-q-idx="${qIdx}"
-                placeholder="Escribe el código de la pregunta aquí (ej. esquema de tablas, plantilla o snippet)..."
+                placeholder="Escribe aquí el código que verá el candidato..."
               >${q.questionCode || ''}</textarea>
             </div>
 
@@ -829,8 +837,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 data-part-idx="${partIdx}"
                 data-q-idx="${qIdx}"
               >
-                <option value="ide" ${respType === 'ide' ? 'selected' : ''}>Código en Pestañas (IDE HTML/CSS/JS/SQL)</option>
-                <option value="multiple" ${respType === 'multiple' ? 'selected' : ''}>Opción Múltiple</option>
+                <option value="multiple" ${respType === 'multiple' ? 'selected' : ''}>Opción Múltiple (yo escribo el código)</option>
+                <option value="code" ${respType === 'code' ? 'selected' : ''}>El candidato escribe código</option>
                 <option value="short" ${respType === 'short' ? 'selected' : ''}>Texto Abierto / Corto</option>
               </select>
             </div>
@@ -872,14 +880,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
               ` : `
                 <div>
-                  <label class="block text-[9px] font-bold text-indigo-500 uppercase">${respType === 'ide' ? 'Código / Output Esperado' : 'Respuesta Correcta'}</label>
+                  <label class="block text-[9px] font-bold text-indigo-500 uppercase">${respType === 'code' ? 'Código Correcto' : 'Respuesta Correcta'}</label>
                   <textarea
                     class="q-correct-code-input font-mono w-full px-3 py-1.5 border border-indigo-200 focus:outline-none rounded-lg text-xs bg-slate-900 text-emerald-400 h-16 custom-scroll"
                     data-part-idx="${partIdx}"
                     data-q-idx="${qIdx}"
-                    placeholder="${respType === 'ide' ? 'Escribe el código esperado o el output compilado...' : 'Escribe la respuesta exacta esperada...'}"
+                    placeholder="${respType === 'code' ? 'Escribe el código correcto...' : 'Escribe la respuesta exacta esperada...'}"
                   >${q.correct || ''}</textarea>
-                  ${respType === 'ide' ? '<p class="text-[9px] text-gray-400 mt-1">La similitud se calcula en el reporte; el candidato no la ve.</p>' : ''}
                 </div>
               `}
             </div>
@@ -941,7 +948,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     if (type === 'programacion') {
       qObj.questionCode = "";
-      qObj.responseType = "ide";
+      qObj.responseType = "multiple";
+      qObj.options = ["", "", "", ""];
     }
     if (type === 'proyectos') {
       qObj.text = "¿Has desarrollado proyectos?";
@@ -1244,6 +1252,20 @@ document.addEventListener('DOMContentLoaded', async () => {
           showAlert(`Selecciona Verdadero o Falso para la pregunta: "${q.text}"`, true);
           return;
         }
+        if (q.type === 'programacion' && (q.responseType || 'code') === 'multiple') {
+          if (!Array.isArray(q.options) || q.options.some(o => !String(o || '').trim())) {
+            showAlert(`La pregunta "${q.text}" tiene opciones vacías.`, true);
+            return;
+          }
+          if (!q.correct) {
+            showAlert(`Selecciona la opción correcta para la pregunta: "${q.text}"`, true);
+            return;
+          }
+        }
+        if (q.type === 'programacion' && (q.responseType || 'code') === 'code' && !String(q.correct || '').trim()) {
+          showAlert(`Escribe el código correcto para la pregunta: "${q.text}"`, true);
+          return;
+        }
       }
     }
 
@@ -1412,14 +1434,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
           `;
         } else if (q.type === 'programacion') {
-          const respType = q.responseType || 'ide';
+          const respType = q.responseType === 'multiple' || q.responseType === 'short' ? q.responseType : 'code';
 
-          let questionConsoleHtml = "";
+          let questionCodeHtml = "";
           if (q.questionCode && q.questionCode.trim()) {
-            questionConsoleHtml = `
+            questionCodeHtml = `
               <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-sky-300 max-h-80 overflow-y-auto whitespace-pre-wrap relative shadow-inner no-scrollbar">
                 <div class="flex items-center border-b border-slate-800 pb-1.5 mb-2 select-none">
-                  <span class="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Consola</span>
+                  <span class="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Código</span>
                 </div>
                 <code>${highlightCode(q.questionCode)}</code>
               </div>
@@ -1428,9 +1450,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           if (respType === 'multiple') {
             widget = `
-              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col text-white relative mb-4" data-q-id="${q.id}">
-                ${questionConsoleHtml}
-              </div>
+              ${questionCodeHtml ? `
+                <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col text-white relative mb-4" data-q-id="${q.id}">
+                  ${questionCodeHtml}
+                </div>
+              ` : ''}
 
               <div class="bg-white p-3 rounded-xl border border-blue-100/50 space-y-2 text-black">
                 <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Selecciona la opción correcta:</span>
@@ -1447,112 +1471,28 @@ document.addEventListener('DOMContentLoaded', async () => {
           } else if (respType === 'short') {
             widget = `
               <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
-                ${questionConsoleHtml}
+                ${questionCodeHtml}
 
                 <div class="space-y-1">
                   <label class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Escribe tu respuesta:</label>
-                  <textarea rows="3" class="sim-tech-textarea-input w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-indigo-500 focus:outline-none custom-scroll" data-q-id="${q.id}" placeholder="Escribe tu código o respuesta aquí..."></textarea>
+                  <textarea rows="3" class="sim-tech-textarea-input w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-indigo-500 focus:outline-none custom-scroll" data-q-id="${q.id}"></textarea>
                 </div>
               </div>
             `;
           } else {
             widget = `
-              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
-                ${questionConsoleHtml}
+              <div class="programacion-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 text-white relative" data-q-id="${q.id}">
+                ${questionCodeHtml}
 
-                <!-- Tab selector -->
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-                  <div class="flex gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
-                    ${['html', 'css', 'js', 'sql'].map(tab => {
-                      const isActive = tab === 'html';
-                      const uppercaseTab = tab.toUpperCase();
-                      return `
-                        <button type="button" class="sim-tab-btn-${q.id} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 ${isActive ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'}" data-tab="${tab}" data-q-id="${q.id}">
-                          ${uppercaseTab}
-                        </button>
-                      `;
-                    }).join('')}
-                  </div>
-                  <div class="text-[9px] text-slate-400 font-bold uppercase tracking-wider bg-slate-950/60 px-2.5 py-1 rounded border border-slate-800">
-                    Modo Programación
-                  </div>
-                </div>
-
-                <!-- Editors and Preview Workspace Grid -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-                  <!-- Code Editors Column -->
-                  <div class="space-y-3">
-                    <!-- HTML Editor -->
-                    <div class="sim-editor-pane-${q.id}" id="sim-pane-html-${q.id}">
-                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
-                        <span>Código HTML5</span>
-                        <span class="text-orange-400">index.html</span>
-                      </div>
-                      <textarea id="sim-code-html-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="<!-- Escribe tu HTML aquí -->"></textarea>
-                    </div>
-
-                    <!-- CSS Editor -->
-                    <div class="sim-editor-pane-${q.id} hidden" id="sim-pane-css-${q.id}">
-                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
-                        <span>Código CSS3</span>
-                        <span class="text-blue-400">styles.css</span>
-                      </div>
-                      <textarea id="sim-code-css-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="/* Escribe tu CSS aquí */"></textarea>
-                    </div>
-
-                    <!-- JS Editor -->
-                    <div class="sim-editor-pane-${q.id} hidden" id="sim-pane-js-${q.id}">
-                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
-                        <span>Código JavaScript</span>
-                        <span class="text-yellow-400">app.js</span>
-                      </div>
-                      <textarea id="sim-code-js-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="// Escribe tu JS aquí (usa console.log para ver resultados)"></textarea>
-                    </div>
-
-                    <!-- SQL Editor -->
-                    <div class="sim-editor-pane-${q.id} hidden" id="sim-pane-sql-${q.id}">
-                      <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1 font-semibold">
-                        <span>Consulta SQL (Tablas: users, vacancies)</span>
-                        <span class="text-cyan-400">query.sql</span>
-                      </div>
-                      <textarea id="sim-code-sql-${q.id}" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 custom-scroll" placeholder="SELECT * FROM users; -- Prueba aquí tus consultas SQL"></textarea>
-                    </div>
-
-                    <!-- Compile Button -->
-                    <button type="button" id="sim-btn-compile-${q.id}" class="sim-btn-compile-class w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 transition duration-200" data-q-id="${q.id}">
-                      Compilar y Guardar Código
-                    </button>
-                  </div>
-
-                  <!-- Live Preview / Terminal Column -->
-                  <div class="space-y-3 flex flex-col justify-between">
-                    <!-- Output Console -->
-                    <div class="flex-1 flex flex-col min-h-0">
-                      <span class="text-[10px] text-slate-400 font-semibold mb-1 block">Consola de Ejecución</span>
-                      <div class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-emerald-400 overflow-y-auto max-h-48 custom-scroll relative shadow-inner flex flex-col justify-between" style="min-height: 120px;">
-                        <pre id="sim-output-console-${q.id}" class="whitespace-pre-wrap font-mono">Sube/Compila tu código para ver el resultado aquí...</pre>
-                        <div class="flex justify-between items-center text-[8px] text-slate-500 mt-2 pt-1 border-t border-slate-900 select-none">
-                          <span>Compilador V1.0.0</span>
-                          <span>Listo</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Live Web Preview Box (Only relevant for HTML/CSS/JS) -->
-                    <div class="h-28 flex flex-col min-h-0" id="sim-preview-box-container-${q.id}">
-                      <span class="text-[10px] text-slate-400 font-semibold mb-1 block">Vista Previa Web</span>
-                      <div class="flex-1 bg-white rounded-xl overflow-hidden border border-slate-800 relative">
-                        <iframe id="sim-preview-frame-${q.id}" class="w-full h-full bg-white block" sandbox="allow-scripts"></iframe>
-                      </div>
-                    </div>
-                  </div>
-
+                <div class="space-y-1">
+                  <label class="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Escribe tu código:</label>
+                  <textarea rows="10" class="sim-tech-code-input w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 focus:ring-1 focus:ring-indigo-500 focus:outline-none custom-scroll" data-q-id="${q.id}" spellcheck="false"></textarea>
                 </div>
               </div>
             `;
           }
         } else if (q.type === 'canvas') {
+
           widget = `
             <div class="illustrator-container mt-3 bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col gap-4 text-white relative select-none overflow-hidden" data-q-id="${q.id}">
 
@@ -1706,6 +1646,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    document.querySelectorAll('.sim-tech-code-input').forEach(ta => {
+      ta.addEventListener('input', () => {
+        const qId = ta.getAttribute('data-q-id');
+        const val = ta.value;
+        if (val.trim()) {
+          simAnswers[qId] = val;
+        } else {
+          delete simAnswers[qId];
+        }
+        const total = Object.keys(simAnswers).length;
+        updateSimProgress(total, qCount);
+      });
+    });
+
     document.querySelectorAll('.sim-proj-block').forEach(block => {
       const qId = block.getAttribute('data-q-id');
       const list = block.querySelector('.sim-proj-list');
@@ -1792,8 +1746,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       part.questions.forEach(q => {
         if (q.type === 'canvas') {
           initSimIllustratorCanvas(q.id);
-        } else if (q.type === 'programacion') {
-          initSimProgramacionIDE(q.id, q);
         }
       });
     });
@@ -2334,249 +2286,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     drawWorkspace();
   }
 
-  function initSimProgramacionIDE(qId, q) {
-    if (q.responseType && q.responseType !== 'ide') {
-      return;
-    }
-    const htmlCodeArea = document.getElementById(`sim-code-html-${qId}`);
-    const cssCodeArea = document.getElementById(`sim-code-css-${qId}`);
-    const jsCodeArea = document.getElementById(`sim-code-js-${qId}`);
-    const sqlCodeArea = document.getElementById(`sim-code-sql-${qId}`);
-    const compileBtn = document.getElementById(`sim-btn-compile-${qId}`);
-    const consoleOutput = document.getElementById(`sim-output-console-${qId}`);
-    const previewFrame = document.getElementById(`sim-preview-frame-${qId}`);
-
-    let activeTab = "html";
-
-    document.querySelectorAll(`.sim-tab-btn-${qId}`).forEach(btn => {
-      btn.addEventListener('click', () => {
-        const selectedTab = btn.getAttribute('data-tab');
-        activeTab = selectedTab;
-
-        document.querySelectorAll(`.sim-tab-btn-${qId}`).forEach(b => {
-          b.className = `sim-tab-btn-${qId} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900`;
-        });
-        btn.className = `sim-tab-btn-${qId} px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 bg-indigo-600 text-white shadow`;
-
-        document.querySelectorAll(`.sim-editor-pane-${qId}`).forEach(pane => {
-          pane.classList.add('hidden');
-        });
-        const activePane = document.getElementById(`sim-pane-${selectedTab}-${qId}`);
-        if (activePane) activePane.classList.remove('hidden');
-
-        saveCurrentCodeState();
-      });
-    });
-
-    function saveCurrentCodeState(compiledOutputValue = "") {
-      const htmlVal = htmlCodeArea ? htmlCodeArea.value : "";
-      const cssVal = cssCodeArea ? cssCodeArea.value : "";
-      const jsVal = jsCodeArea ? jsCodeArea.value : "";
-      const sqlVal = sqlCodeArea ? sqlCodeArea.value : "";
-
-      const newAnswerObj = {
-        html: htmlVal,
-        css: cssVal,
-        js: jsVal,
-        sql: sqlVal,
-        compiledOutput: compiledOutputValue || (simAnswers[qId] && simAnswers[qId].compiledOutput) || "",
-        activeTab: activeTab
-      };
-
-      simAnswers[qId] = newAnswerObj;
-
-      const total = Object.keys(simAnswers).length;
-      const qCount = partsData.reduce((acc, p) => acc + p.questions.length, 0);
-      updateSimProgress(total, qCount);
-    }
-
-    if (compileBtn) {
-      compileBtn.addEventListener('click', () => {
-        const htmlVal = htmlCodeArea ? htmlCodeArea.value : "";
-        const cssVal = cssCodeArea ? cssCodeArea.value : "";
-        const jsVal = jsCodeArea ? jsCodeArea.value : "";
-        const sqlVal = sqlCodeArea ? sqlCodeArea.value : "";
-
-        let outputStr = "";
-
-        if (activeTab === 'js') {
-          outputStr = executeSimJS(jsVal);
-        } else if (activeTab === 'sql') {
-          outputStr = executeSimMockSQL(sqlVal);
-        } else {
-          outputStr = "Páginas cargadas y compiladas con éxito.";
-        }
-
-        if (previewFrame) {
-          const combinedSrc = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <style>${cssVal}</style>
-            </head>
-            <body style="margin:8px;font-family:sans-serif;color:black;">
-              ${htmlVal}
-              <script>
-                try {
-                  ${jsVal}
-                } catch(e) {
-                  document.body.innerHTML += '<div style="color:red;font-family:monospace;margin-top:10px;">Error: ' + e.message + '</div>';
-                }
-              </script>
-            </body>
-            </html>
-          `;
-          previewFrame.srcdoc = combinedSrc;
-        }
-
-        if (consoleOutput) {
-          consoleOutput.textContent = outputStr;
-        }
-
-        saveCurrentCodeState(outputStr);
-        showPastelAlert("¡Código compilador ejecutado y resultado guardado en simulación!", "Compilador");
-      });
-    }
-
-    [htmlCodeArea, cssCodeArea, jsCodeArea, sqlCodeArea].forEach(area => {
-      if (area) {
-        area.addEventListener('input', () => {
-          saveCurrentCodeState();
-        });
-      }
-    });
-  }
-
-  function executeSimJS(code) {
-    let logs = [];
-    const originalLog = console.log;
-    console.log = function(...args) {
-      logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
-    };
-
-    try {
-      const result = eval(code);
-      console.log = originalLog;
-      if (logs.length > 0) {
-        return logs.join('\n');
-      }
-      return result !== undefined ? String(result) : "Code executed successfully with no output.";
-    } catch (err) {
-      console.log = originalLog;
-      return `Error de Ejecución: ${err.message}`;
-    }
-  }
-
-  function executeSimMockSQL(sql) {
-    const query = sql.trim().replace(/\s+/g, ' ');
-    const selectMatch = query.match(/^SELECT\s+(.+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+?))?(?:\s+ORDER\s+BY\s+(.+?))?$/i);
-    if (!selectMatch) {
-      return "Error SQL: Solo consultas SELECT son soportadas en este compilador de simulación (Tablas: users, vacancies).";
-    }
-    const fieldsStr = selectMatch[1].trim();
-    const tableName = selectMatch[2].trim().toLowerCase();
-    const whereStr = selectMatch[3] ? selectMatch[3].trim() : null;
-    const orderByStr = selectMatch[4] ? selectMatch[4].trim() : null;
-
-    const mockDB = {
-      users: [
-        { id: 1, name: "Ana Lopez", role: "Developer", score: 95 },
-        { id: 2, name: "Carlos Ruiz", role: "Designer", score: 88 },
-        { id: 3, name: "Sofia Perez", role: "Developer", score: 92 }
-      ],
-      vacancies: [
-        { id: 1, title: "Frontend Dev", status: "Open" },
-        { id: 2, title: "UI/UX Designer", status: "Closed" }
-      ]
-    };
-
-    if (!mockDB[tableName]) {
-      return `Error SQL: Table "${tableName}" not found. Tables available: users, vacancies`;
-    }
-
-    let rows = [...mockDB[tableName]];
-
-    if (whereStr) {
-      const whereMatch = whereStr.match(/(\w+)\s*(=|!=|>|<)\s*(.+)/);
-      if (whereMatch) {
-        const field = whereMatch[1].trim();
-        const op = whereMatch[2].trim();
-        let val = whereMatch[3].trim().replace(/['"]/g, '');
-        rows = rows.filter(row => {
-          let rowVal = row[field];
-          if (typeof rowVal === 'number') {
-            val = parseFloat(val);
-          }
-          if (op === '=') return rowVal == val;
-          if (op === '!=') return rowVal != val;
-          if (op === '>') return rowVal > val;
-          if (op === '<') return rowVal < val;
-          return true;
-        });
-      }
-    }
-
-    if (orderByStr) {
-      const orderParts = orderByStr.split(' ');
-      const field = orderParts[0].trim();
-      const desc = orderParts[1] && orderParts[1].toUpperCase() === 'DESC';
-      rows.sort((a, b) => {
-        if (a[field] < b[field]) return desc ? 1 : -1;
-        if (a[field] > b[field]) return desc ? -1 : 1;
-        return 0;
-      });
-    }
-
-    let fields = fieldsStr.split(',').map(f => f.trim());
-    if (fields.length === 1 && fields[0] === '*') {
-      fields = Object.keys(mockDB[tableName][0]);
-    }
-
-    const colWidths = {};
-    fields.forEach(f => {
-      colWidths[f] = f.length;
-      rows.forEach(r => {
-        const cellVal = String(r[f] !== undefined ? r[f] : '');
-        if (cellVal.length > colWidths[f]) {
-          colWidths[f] = cellVal.length;
-        }
-      });
-    });
-
-    let output = '';
-    let border = '+';
-    fields.forEach(f => {
-      border += '-'.repeat(colWidths[f] + 2) + '+';
-    });
-    output += border + '\n';
-
-    let headerRow = '|';
-    fields.forEach(f => {
-      headerRow += ' ' + f.toUpperCase().padEnd(colWidths[f]) + ' |';
-    });
-    output += headerRow + '\n' + border + '\n';
-
-    if (rows.length === 0) {
-      let emptyRow = '|';
-      const totalW = fields.reduce((sum, f) => sum + colWidths[f] + 3, 0) - 1;
-      emptyRow += ' No rows returned '.padEnd(totalW) + '|';
-      output += emptyRow + '\n' + border + '\n';
-    } else {
-      rows.forEach(r => {
-        let rowStr = '|';
-        fields.forEach(f => {
-          const cellVal = String(r[f] !== undefined ? r[f] : '');
-          rowStr += ' ' + cellVal.padEnd(colWidths[f]) + ' |';
-        });
-        rowStr += '\n';
-        output += rowStr;
-      });
-      output += border + '\n';
-    }
-
-    return output.trim();
-  }
-
   if (btnSimSubmit) {
     btnSimSubmit.addEventListener('click', () => {
       const missingRequired = partsData.reduce((acc, p) =>
@@ -2682,43 +2391,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <p class="text-xs text-gray-600"><strong>Respuesta correcta:</strong> ${escapeHTML(q.correct)}</p>
               `;
             } else if (q.type === 'programacion') {
-              const respType = q.responseType || 'ide';
-              if (respType === 'multiple' || respType === 'short') {
-                isCorrect = (String(ans).trim() === String(q.correct || "").trim());
-                comparisonDetails = `
-                  <p class="text-xs text-gray-600 mt-1"><strong>Tu respuesta:</strong> ${escapeHTML(ans)}</p>
-                  <p class="text-xs text-gray-600"><strong>Respuesta correcta:</strong> ${escapeHTML(q.correct)}</p>
-                `;
-              } else {
-                // IDE mode
-                if (ans && typeof ans === 'object') {
-                  const compiledMatch = ans.compiledOutput && ans.compiledOutput.trim() === (q.correct || "").trim();
-                  const sqlMatch = ans.sql && ans.sql.trim() === (q.correct || "").trim();
-                  const jsMatch = ans.js && ans.js.trim() === (q.correct || "").trim();
-                  const htmlMatch = ans.html && ans.html.trim() === (q.correct || "").trim();
-                  const cssMatch = ans.css && ans.css.trim() === (q.correct || "").trim();
+              if (ans && typeof ans === 'object') {
+                const compiledMatch = ans.compiledOutput && ans.compiledOutput.trim() === (q.correct || "").trim();
+                const sqlMatch = ans.sql && ans.sql.trim() === (q.correct || "").trim();
+                const jsMatch = ans.js && ans.js.trim() === (q.correct || "").trim();
+                const htmlMatch = ans.html && ans.html.trim() === (q.correct || "").trim();
+                const cssMatch = ans.css && ans.css.trim() === (q.correct || "").trim();
 
-                  isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(ans) === String(q.correct));
+                isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(ans) === String(q.correct));
 
-                  const expectedCode = String(q.correct || '').trim();
-                  const candidateCodes = [ans.sql, ans.js, ans.html, ans.css, ans.compiledOutput]
-                    .filter(c => c && String(c).trim());
-                  if (expectedCode && candidateCodes.length) {
-                    simProgrammingSimilarity = Math.max(...candidateCodes.map(c => window.calculateCodeSimilarity(expectedCode, c)));
-                  } else if (expectedCode || candidateCodes.length) {
-                    simProgrammingSimilarity = 0;
-                  }
-                } else if (ans) {
-                  isCorrect = (String(ans).trim() === String(q.correct || "").trim());
+                const expectedCode = String(q.correct || '').trim();
+                const candidateCodes = [ans.sql, ans.js, ans.html, ans.css, ans.compiledOutput]
+                  .filter(c => c && String(c).trim());
+                if (expectedCode && candidateCodes.length) {
+                  simProgrammingSimilarity = Math.max(...candidateCodes.map(c => window.calculateCodeSimilarity(expectedCode, c)));
+                } else if (expectedCode || candidateCodes.length) {
+                  simProgrammingSimilarity = 0;
                 }
 
                 const fullCodeParts = [];
-                if (ans && typeof ans === 'object') {
-                  if (ans.html) fullCodeParts.push(`HTML:\n${ans.html}`);
-                  if (ans.css) fullCodeParts.push(`CSS:\n${ans.css}`);
-                  if (ans.js) fullCodeParts.push(`JS:\n${ans.js}`);
-                  if (ans.sql) fullCodeParts.push(`SQL:\n${ans.sql}`);
-                }
+                if (ans.html) fullCodeParts.push(`HTML:\n${ans.html}`);
+                if (ans.css) fullCodeParts.push(`CSS:\n${ans.css}`);
+                if (ans.js) fullCodeParts.push(`JS:\n${ans.js}`);
+                if (ans.sql) fullCodeParts.push(`SQL:\n${ans.sql}`);
                 const fullCode = fullCodeParts.join('\n\n');
                 const similarityValue = simProgrammingSimilarity ?? 0;
                 comparisonDetails = `
@@ -2734,13 +2429,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <p class="text-xs text-gray-600 mt-1"><strong>Tu código:</strong></p>
                   <pre class="bg-slate-900 text-slate-300 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(fullCode || "Sin código")}</pre>
                   <p class="text-xs text-gray-600 mt-1"><strong>Código correcto esperado:</strong></p>
-                  <pre class="bg-slate-900 text-emerald-400 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(q.correct)}</pre>
+                  <pre class="bg-slate-900 text-emerald-400 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(q.correct || "Sin código")}</pre>
+                `;
+              } else {
+                const answerText = typeof ans === 'string' ? ans.trim() : '';
+                isCorrect = answerText !== '' && answerText === String(q.correct || '').trim();
+                const expectedCode = String(q.correct || '').trim();
+                if (expectedCode && answerText) {
+                  simProgrammingSimilarity = window.calculateCodeSimilarity(expectedCode, answerText);
+                } else if (expectedCode || answerText) {
+                  simProgrammingSimilarity = 0;
+                }
+                const similarityValue = simProgrammingSimilarity ?? 0;
+                comparisonDetails = `
+                  <div class="mt-2 bg-indigo-50 p-2.5 rounded-xl border border-indigo-100">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Similitud de sintaxis</span>
+                      <span class="text-sm font-extrabold text-indigo-700">${similarityValue}%</span>
+                    </div>
+                    <div class="w-full bg-indigo-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                      <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${similarityValue}%"></div>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-600 mt-1"><strong>Tu código:</strong></p>
+                  <pre class="bg-slate-900 text-slate-300 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(answerText || "Sin código")}</pre>
+                  <p class="text-xs text-gray-600 mt-1"><strong>Código correcto esperado:</strong></p>
+                  <pre class="bg-slate-900 text-emerald-400 p-2 rounded text-[10px] font-mono mt-1 overflow-x-auto max-w-full">${escapeHTML(q.correct || "Sin código")}</pre>
                 `;
               }
             }
 
-            const isIdeCode = q.type === 'programacion' && (q.responseType || 'ide') === 'ide';
-            if (isIdeCode) {
+            const isCodeLike = q.type === 'programacion' && q.responseType !== 'multiple' && q.responseType !== 'short';
+            if (isCodeLike) {
               if (isCorrect) correctCount++;
               statusBadge = `
                 <span class="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">

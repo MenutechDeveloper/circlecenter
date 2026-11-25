@@ -208,8 +208,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isGradable) {
           totalQuestions++;
           if (q.type === 'programacion') {
-            const respType = q.responseType || 'ide';
-            if (respType === 'multiple' || respType === 'short') {
+            if (q.userAnswer && typeof q.userAnswer === 'object') {
+              const ansObj = q.userAnswer;
+              const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
+              const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
+              const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
+              const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
+              const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
+              const isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
+              if (isCorrect) correct++; else incorrect++;
+            } else {
               const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
               if (ans === "") {
                 empty++;
@@ -217,24 +225,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 correct++;
               } else {
                 incorrect++;
-              }
-            } else {
-              const ansObj = typeof q.userAnswer === 'object' ? q.userAnswer : null;
-              if (!ansObj) {
-                empty++;
-              } else {
-                const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
-                const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
-                const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
-                const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
-                const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
-
-                const isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
-                if (isCorrect) {
-                  correct++;
-                } else {
-                  incorrect++;
-                }
               }
             }
           } else {
@@ -313,31 +303,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         let isCorrect = hasCorrect && (q.userAnswer === q.correct);
         let programmingSimilarity = null;
         if (q.type === 'programacion') {
-          const respType = q.responseType || 'ide';
-          if (respType === 'multiple' || respType === 'short') {
-            const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
-            isCorrect = (ans === (q.correct || "").trim());
+          if (q.userAnswer && typeof q.userAnswer === 'object') {
+            const ansObj = q.userAnswer;
+            const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
+            const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
+            const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
+            const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
+            const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
+
+            isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
+
+            const expectedCode = String(q.correct || '').trim();
+            const candidateCodes = [ansObj.sql, ansObj.js, ansObj.html, ansObj.css, ansObj.compiledOutput]
+              .filter(c => c && String(c).trim());
+            if (expectedCode && candidateCodes.length) {
+              programmingSimilarity = Math.max(...candidateCodes.map(c => window.calculateCodeSimilarity(expectedCode, c)));
+            } else if (expectedCode || candidateCodes.length) {
+              programmingSimilarity = 0;
+            }
           } else {
-            const ansObj = typeof q.userAnswer === 'object' ? q.userAnswer : null;
-            if (ansObj) {
-              const compiledMatch = ansObj.compiledOutput && ansObj.compiledOutput.trim() === (q.correct || "").trim();
-              const sqlMatch = ansObj.sql && ansObj.sql.trim() === (q.correct || "").trim();
-              const jsMatch = ansObj.js && ansObj.js.trim() === (q.correct || "").trim();
-              const htmlMatch = ansObj.html && ansObj.html.trim() === (q.correct || "").trim();
-              const cssMatch = ansObj.css && ansObj.css.trim() === (q.correct || "").trim();
-
-              isCorrect = compiledMatch || sqlMatch || jsMatch || htmlMatch || cssMatch || (String(q.userAnswer) === String(q.correct));
-
-              const expectedCode = String(q.correct || '').trim();
-              const candidateCodes = [ansObj.sql, ansObj.js, ansObj.html, ansObj.css, ansObj.compiledOutput]
-                .filter(c => c && String(c).trim());
-              if (expectedCode && candidateCodes.length) {
-                programmingSimilarity = Math.max(...candidateCodes.map(c => window.calculateCodeSimilarity(expectedCode, c)));
-              } else if (expectedCode || candidateCodes.length) {
-                programmingSimilarity = 0;
-              }
-            } else {
-              isCorrect = false;
+            const ans = typeof q.userAnswer === 'string' ? q.userAnswer.trim() : "";
+            isCorrect = ans !== '' && ans === (q.correct || "").trim();
+            const expectedCode = String(q.correct || '').trim();
+            if (expectedCode && ans) {
+              programmingSimilarity = window.calculateCodeSimilarity(expectedCode, ans);
+            } else if (expectedCode || ans) {
+              programmingSimilarity = 0;
             }
           }
         }
@@ -348,8 +339,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (q.type === 'canvas') {
           badge = `<span class="text-[9px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-100"><i class="fa-solid fa-palette text-purple-500"></i> Diseño Canvas</span>`;
         } else if (q.type === 'programacion') {
-          const isIde = (q.responseType || 'ide') === 'ide';
-          const similarityBadge = isIde
+          const isCode = q.responseType !== 'multiple' && q.responseType !== 'short';
+          const similarityBadge = isCode
             ? `<span class="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100"><i class="fa-solid fa-code"></i> Similitud ${programmingSimilarity ?? 0}%</span>`
             : (isCorrect
               ? '<span class="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-check"></i> Correcto</span>'
@@ -438,8 +429,35 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
           }
         } else if (q.type === 'programacion') {
-          const respType = q.responseType || 'ide';
-          if (respType === 'multiple' || respType === 'short') {
+          const respType = q.responseType === 'multiple' || q.responseType === 'short' ? q.responseType : 'code';
+          if (respType === 'code') {
+            const ansObj = q.userAnswer && typeof q.userAnswer === 'object' ? q.userAnswer : null;
+            const candidateCode = ansObj
+              ? [ansObj.html, ansObj.css, ansObj.js, ansObj.sql].filter(Boolean).join('\n\n')
+              : (typeof q.userAnswer === 'string' ? q.userAnswer : '');
+            const similarityValue = programmingSimilarity ?? 0;
+            answerWidget = `
+              <div class="col-span-2 space-y-2 mt-1">
+                <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Similitud de sintaxis</span>
+                    <span class="text-lg font-extrabold text-indigo-700">${similarityValue}%</span>
+                  </div>
+                  <div class="w-full bg-indigo-100 rounded-full h-2 mt-2 overflow-hidden">
+                    <div class="bg-indigo-500 h-2 rounded-full" style="width: ${similarityValue}%"></div>
+                  </div>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-white font-mono text-xs shadow-inner">
+                  <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Código Escrito por el Candidato</span>
+                  <pre class="overflow-x-auto max-h-48 whitespace-pre-wrap custom-scroll text-sky-300">${escapeHTML(candidateCode || 'Sin código')}</pre>
+                </div>
+                <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs">
+                  <strong class="text-[8px] text-gray-400 block uppercase">Código Correcto</strong>
+                  <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin código')}</pre>
+                </div>
+              </div>
+            `;
+          } else {
             answerWidget = `
               <div class="col-span-2 space-y-2 mt-1">
                 <div class="bg-blue-50/20 p-2 rounded-lg border border-blue-100/20 text-xs">
@@ -452,49 +470,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
               </div>
             `;
-          } else {
-            const ansObj = typeof q.userAnswer === 'object' ? q.userAnswer : null;
-            if (ansObj) {
-              const codeParts = [];
-              if (ansObj.html) codeParts.push(`HTML:\n${ansObj.html}`);
-              if (ansObj.css) codeParts.push(`CSS:\n${ansObj.css}`);
-              if (ansObj.js) codeParts.push(`JS:\n${ansObj.js}`);
-              if (ansObj.sql) codeParts.push(`SQL:\n${ansObj.sql}`);
-
-              const fullCode = codeParts.join('\n\n');
-              const similarityValue = programmingSimilarity ?? 0;
-              answerWidget = `
-                <div class="col-span-2 space-y-2 mt-1">
-                  <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-                    <div class="flex items-center justify-between">
-                      <span class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Similitud de sintaxis</span>
-                      <span class="text-lg font-extrabold text-indigo-700">${similarityValue}%</span>
-                    </div>
-                    <div class="w-full bg-indigo-100 rounded-full h-2 mt-2 overflow-hidden">
-                      <div class="bg-indigo-500 h-2 rounded-full" style="width: ${similarityValue}%"></div>
-                    </div>
-                  </div>
-                  <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-white font-mono text-xs shadow-inner">
-                    <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Código Escrito por el Candidato</span>
-                    <pre class="overflow-x-auto max-h-48 whitespace-pre-wrap custom-scroll text-sky-300">${escapeHTML(fullCode || 'Sin código')}</pre>
-                  </div>
-                  <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 text-emerald-400 font-mono text-xs shadow-inner">
-                    <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Resultado de la Compilación</span>
-                    <pre class="overflow-x-auto max-h-32 whitespace-pre-wrap custom-scroll">${escapeHTML(ansObj.compiledOutput || 'Sin compilar')}</pre>
-                  </div>
-                  <div class="bg-emerald-50/10 p-2 rounded-lg border border-emerald-100/10 text-xs col-span-2">
-                    <strong class="text-[8px] text-gray-400 block uppercase">Código / Resultado Esperado por el Reclutador</strong>
-                    <pre class="font-mono text-emerald-950 whitespace-pre-wrap">${escapeHTML(q.correct || 'Sin resultado esperado')}</pre>
-                  </div>
-                </div>
-              `;
-            } else {
-              answerWidget = `
-                <div class="col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 text-center text-xs text-slate-400 mt-1">
-                  El candidato no guardó ni compiló código.
-                </div>
-              `;
-            }
           }
         } else {
           answerWidget = `
