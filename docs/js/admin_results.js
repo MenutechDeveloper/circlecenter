@@ -453,15 +453,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    if (editable) {
-      container.innerHTML += `
-        <div class="edit-correct-banner bg-violet-50 border border-violet-100 text-violet-700 text-[11px] rounded-xl p-3 flex items-start gap-2">
-          <i class="fa-solid fa-circle-info mt-0.5"></i>
-          <span>Puedes corregir la <strong>clave esperada</strong> con el botón "Editar clave". La respuesta del candidato no se modifica y el porcentaje se recalcula automáticamente.</span>
-        </div>
-      `;
-    }
-
     parts.forEach((part, partIdx) => {
       const partTitle = part.title && String(part.title).trim() ? part.title : 'Preguntas';
       let partHtml = `
@@ -527,7 +518,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const editButton = editable ? `
-          <button type="button" class="edit-correct-btn text-[9px] font-bold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-100 px-2 py-0.5 rounded-full transition" data-part-idx="${partIdx}" data-q-idx="${idx}" title="Editar mi respuesta correcta">
+          <button type="button" class="edit-correct-btn text-[9px] font-bold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-100 px-2 py-0.5 rounded-full transition" data-part-idx="${partIdx}" data-q-idx="${idx}">
             <i class="fa-solid fa-pen mr-1"></i>Editar clave
           </button>
         ` : '';
@@ -705,14 +696,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function showResultsToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'fixed top-4 left-4 z-[300] bg-violet-600 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2600);
-  }
-
   function openCorrectEditor(btn) {
     if (!activeReport) return;
     const partIdx = Number(btn.dataset.partIdx);
@@ -871,7 +854,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       activeReport.max_score = score.total;
       refreshActiveReport();
       renderResults();
-      showResultsToast('Clave actualizada. Porcentaje recalculado.');
     } catch (err) {
       q.correct = originalValue;
       activeReport.score = originalScore;
@@ -981,7 +963,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const clone = modalContent.cloneNode(true);
       clone.classList.add('pdf-report');
-      clone.querySelectorAll('#modal-footer, #modal-tabs, #modal-assign-extra-section, #modal-close-btn, .edit-correct-btn, .edit-correct-banner').forEach(el => el.remove());
+      clone.querySelectorAll('#modal-footer, #modal-tabs, #modal-assign-extra-section, #modal-close-btn, .edit-correct-btn').forEach(el => el.remove());
       clone.querySelectorAll('[data-correct-editor]').forEach(el => el.remove());
       clone.querySelectorAll('[data-correct-display]').forEach(el => el.classList.remove('hidden'));
 
