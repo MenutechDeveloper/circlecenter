@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalCandScore = document.getElementById('modal-cand-score');
   const modalCandPercentage = document.getElementById('modal-cand-percentage');
   const modalCandInfoFields = document.getElementById('modal-cand-info-fields');
+  const modalTabPsyBtn = document.getElementById('modal-tab-psy-btn');
+  const modalTabTechBtn = document.getElementById('modal-tab-tech-btn');
   const modalAnswersPsy = document.getElementById('modal-answers-psy');
   const modalAnswersTech = document.getElementById('modal-answers-tech');
 
@@ -320,6 +322,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAnswers(modalAnswersPsy, report.psychometric_answers);
     renderAnswers(modalAnswersTech, report.technical_answers);
 
+    // Resetear Tabs
+    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
+    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
+    modalAnswersPsy.classList.remove('hidden');
+    modalAnswersTech.classList.add('hidden');
+
     resultModal.classList.remove('hidden');
   }
 
@@ -592,6 +600,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   modalCloseBtn.addEventListener('click', closeModal);
   modalCloseBottomBtn.addEventListener('click', closeModal);
+
+  modalTabPsyBtn.addEventListener('click', () => {
+    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
+    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
+    modalAnswersPsy.classList.remove('hidden');
+    modalAnswersTech.classList.add('hidden');
+  });
+
+  modalTabTechBtn.addEventListener('click', () => {
+    modalTabTechBtn.className = "pb-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold text-sm";
+    modalTabPsyBtn.className = "pb-2 px-4 border-b-2 border-transparent text-gray-500 font-bold text-sm hover:text-blue-600";
+    modalAnswersTech.classList.remove('hidden');
+    modalAnswersPsy.classList.add('hidden');
+  });
 
   modalPrintBtn.addEventListener('click', () => {
     window.print();
