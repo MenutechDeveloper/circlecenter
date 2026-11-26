@@ -156,6 +156,12 @@ function renderPublicReport(report) {
         <div class="text-xs font-extrabold bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full">${score.total > 0 ? `${score.scorePct}%` : '—'}</div>
       </div>
 
+      ${aiHtml ? `
+        <section>
+          <h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-file-shield mr-1 text-violet-500"></i> Detector de IA</h2>
+          <div class="space-y-2">${aiHtml}</div>
+        </section>
+      ` : ''}
       <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
         <h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-circle-info mr-1 text-blue-400"></i> Información del Candidato</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600">
@@ -175,12 +181,6 @@ function renderPublicReport(report) {
         <div id="public-tech-answers" class="space-y-3"></div>
       </section>
 
-      ${aiHtml ? `
-        <section>
-          <h2 class="text-sm font-bold text-gray-700 mb-3"><i class="fa-solid fa-file-shield mr-1 text-violet-500"></i> Detector de IA</h2>
-          <div class="space-y-2">${aiHtml}</div>
-        </section>
-      ` : ''}
     </div>
 
     <div class="px-6 py-4 border-t border-gray-100 text-center text-[10px] text-gray-400">
