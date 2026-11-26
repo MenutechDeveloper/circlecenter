@@ -8,6 +8,19 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    .pdf-capture {
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
+    .pdf-capture [class*="max-h-"] {
+      max-height: none !important;
+    }
+    .pdf-capture [class*="overflow-"] {
+      overflow: visible !important;
+    }
+    .pdf-capture .pdf-question img {
+      max-height: 240mm !important;
+    }
     @media print {
       * {
         -webkit-print-color-adjust: exact !important;
@@ -67,8 +80,8 @@
     <div id="public-status" class="hidden bg-white rounded-2xl border border-rose-100 p-6 text-center text-sm text-gray-600 shadow-sm"></div>
     <div id="public-report" class="hidden bg-white rounded-3xl border border-blue-100 shadow-xl overflow-hidden"></div>
     <div class="no-print mt-5 flex items-center justify-center gap-3">
-      <button id="print-btn" class="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-sm shadow-md transition">
-        <i class="fa-solid fa-print mr-1"></i> Imprimir / Guardar PDF
+      <button id="download-btn" class="hidden px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-sm shadow-md transition">
+        <i class="fa-solid fa-file-arrow-down mr-1"></i> Descargar PDF
       </button>
       <button id="close-btn" class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-sm transition">
         Cerrar
@@ -79,6 +92,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase.js"></script>
   <script src="js/code_similarity.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="js/public_report.js"></script>
 </body>
 </html>
