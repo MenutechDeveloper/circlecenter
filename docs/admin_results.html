@@ -191,9 +191,12 @@
         <button id="modal-delete-btn" class="px-5 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold rounded-xl text-sm transition">
           <i class="fa-regular fa-trash-can mr-1"></i> Eliminar Registro
         </button>
-        <div class="flex">
-          <button id="modal-print-btn" title="Descargar el reporte en PDF" class="px-5 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold rounded-xl text-sm transition mr-3">
-            <i class="fa-solid fa-file-arrow-down mr-1"></i> Descargar PDF
+        <div class="flex flex-wrap gap-2">
+          <button id="modal-share-btn" title="Copiar el enlace público del reporte" class="px-5 py-2 bg-violet-100 text-violet-700 hover:bg-violet-200 font-bold rounded-xl text-sm transition">
+            <i class="fa-solid fa-link mr-1"></i> Copiar enlace
+          </button>
+          <button id="modal-print-btn" title="Abrir el reporte público para imprimir o guardar como PDF" class="px-5 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold rounded-xl text-sm transition">
+            <i class="fa-solid fa-print mr-1"></i> Imprimir / PDF
           </button>
           <button id="modal-close-bottom-btn" class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-sm transition">
             Cerrar
@@ -212,7 +215,6 @@
 
   <script src="js/supabase.js"></script>
   <script src="js/code_similarity.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="js/admin_results.js"></script>
 </body>
 </html>
