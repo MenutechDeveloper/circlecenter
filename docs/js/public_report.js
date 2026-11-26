@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderPublicReport(report);
   reportEl.classList.remove('hidden');
+  if (downloadBtn) downloadBtn.classList.remove('hidden');
   document.title = 'Reporte - ' + (report.candidate_name || 'Candidato');
 
   if (params.get('download') === '1') {
