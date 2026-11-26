@@ -12,7 +12,7 @@ const DEFAULT_PROJECT_CONFIG = PUBLIC_DEFAULT_PROJECT_CONFIG;
 document.addEventListener('DOMContentLoaded', async () => {
   const reportEl = document.getElementById('public-report');
   const statusEl = document.getElementById('public-status');
-  const printBtn = document.getElementById('print-btn');
+  const downloadBtn = document.getElementById('download-btn');
   const closeBtn = document.getElementById('close-btn');
   const params = new URLSearchParams(window.location.search);
   const resultId = params.get('id');
@@ -21,10 +21,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusEl.textContent = message;
     statusEl.classList.remove('hidden');
     reportEl.classList.add('hidden');
-    printBtn.classList.add('hidden');
+    if (downloadBtn) downloadBtn.classList.add('hidden');
   }
 
-  printBtn.addEventListener('click', () => window.print());
+  if (downloadBtn) downloadBtn.addEventListener('click', downloadPublicReportPDF);
   closeBtn.addEventListener('click', () => {
     if (window.history.length > 1) window.history.back();
     else window.close();
@@ -55,10 +55,76 @@ document.addEventListener('DOMContentLoaded', async () => {
   reportEl.classList.remove('hidden');
   document.title = 'Reporte - ' + (report.candidate_name || 'Candidato');
 
-  if (params.get('print') === '1') {
-    setTimeout(() => window.print(), 700);
+  if (params.get('download') === '1') {
+    setTimeout(() => downloadPublicReportPDF(), 900);
   }
 });
+
+async function downloadPublicReportPDF() {
+  const reportEl = document.getElementById('public-report');
+  const downloadBtn = document.getElementById('download-btn');
+  if (!reportEl || reportEl.classList.contains('hidden')) return;
+  if (typeof html2canvas === 'undefined' || !window.jspdf || !window.jspdf.jsPDF) {
+    alert('No se pudo cargar el generador de PDF. Revisa tu conexión e intenta de nuevo.');
+    return;
+  }
+
+  const original = downloadBtn ? downloadBtn.innerHTML : '';
+  if (downloadBtn) {
+    downloadBtn.disabled = true;
+    downloadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Generando PDF...';
+  }
+
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    reportEl.classList.add('pdf-capture');
+    const rect = reportEl.getBoundingClientRect();
+    const canvas = await html2canvas(reportEl, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      windowWidth: window.innerWidth,
+      width: Math.ceil(rect.width),
+      height: Math.ceil(reportEl.scrollHeight)
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+    const contentWidth = pageWidth - margin * 2;
+    const contentHeight = pageHeight - margin * 2;
+    const imgWidth = contentWidth;
+    const imgHeight = canvas.height * imgWidth / canvas.width;
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    let heightLeft = imgHeight;
+    let position = margin;
+    pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+    heightLeft -= contentHeight;
+    while (heightLeft > 0) {
+      position = margin - (imgHeight - heightLeft);
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+      heightLeft -= contentHeight;
+    }
+
+    const title = (document.title || 'reporte').replace(/^Reporte\s*-\s*/i, '').trim();
+    const safeName = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'candidato';
+    pdf.save(`reporte_${safeName}.pdf`);
+  } catch (err) {
+    console.error('No se pudo generar el PDF:', err);
+    alert('No se pudo generar el PDF. Intenta de nuevo.');
+  } finally {
+    reportEl.classList.remove('pdf-capture');
+    if (downloadBtn) {
+      downloadBtn.disabled = false;
+      downloadBtn.innerHTML = original;
+    }
+  }
+}
 
 function renderPublicReport(report) {
   const reportEl = document.getElementById('public-report');

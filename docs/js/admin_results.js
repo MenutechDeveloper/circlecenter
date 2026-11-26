@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resultModal = document.getElementById('result-modal');
   const modalCloseBtn = document.getElementById('modal-close-btn');
   const modalCloseBottomBtn = document.getElementById('modal-close-bottom-btn');
-  const modalPrintBtn = document.getElementById('modal-print-btn');
+  const modalDownloadBtn = document.getElementById('modal-download-btn');
   const modalShareBtn = document.getElementById('modal-share-btn');
   const modalDeleteBtn = document.getElementById('modal-delete-btn');
   const modalCandName = document.getElementById('modal-cand-name');
@@ -746,10 +746,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('#modal-ai-detector details').forEach(details => { details.open = true; });
   });
 
-  function getPublicReportUrl(report, print = false) {
+  function getPublicReportUrl(report, download = false) {
     const url = new URL('reporte_publico.html', window.location.href);
     url.searchParams.set('id', report.id);
-    if (print) url.searchParams.set('print', '1');
+    if (download) url.searchParams.set('download', '1');
     return url.toString();
   }
 
@@ -768,7 +768,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  modalPrintBtn.addEventListener('click', () => {
+  modalDownloadBtn.addEventListener('click', () => {
     if (!activeReport) return;
     window.open(getPublicReportUrl(activeReport, true), '_blank');
   });
